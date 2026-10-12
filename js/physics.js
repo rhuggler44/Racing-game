@@ -32,6 +32,7 @@ export class Car {
     this.surface = surface;
     this.p = { ...params };
     this.assists = true;
+    this.handling = 'sim'; // 'easy' = arcade throttle-steer model
     this.events = [];
     this._sm = {};
     this._pr = {};
@@ -61,6 +62,7 @@ export class Car {
     this.hookCooldown = 0;
     this.onCushion = 0;
     this.surfaceKind = 'track';
+    this._pathRate = 0; this._lastAng = undefined; this._slide = 0; this.pushing = false;
   }
 
   get speed() { return Math.hypot(this.u, this.v); }
@@ -112,6 +114,8 @@ export class Car {
     const gx = -sm.nx * aIn, gz = -sm.nz * aIn;
     const aExtF = gx * fx + gz * fz;
     const aExtR = gx * rx + gz * rz;
+
+    if (this.handling === 'easy') return this._easy(dt, inp, sm, mu, crr, bank, aIn);
 
     let u = this.u, v = this.v, w = this.w;
     const uu = Math.max(Math.abs(u), 2);
@@ -221,6 +225,102 @@ export class Car {
     const wheelTarget = u + (spin > 0 ? Math.min(spin, 1.5) * 9 + 4 : 0) * (Fd > 0 ? 1 : 0);
     this.rearWheelSpeed += (wheelTarget - this.rearWheelSpeed) * Math.min(1, dt * 10);
     this.frontWheelSpeed = u;
+    const rpmT = clamp(Math.abs(this.rearWheelSpeed) * P.rpmPerMps, 2300, 9400);
+    this.rpm += (rpmT - this.rpm) * Math.min(1, dt * 12);
+    this.throttle = thr;
+  }
+
+  // Easy handling: arcade-style, driven with the throttle.
+  //  - the path the car travels turns from the steering plus the slide angle:
+  //    gas in a corner kicks the rear out (stagger + wheelspin), the nose swings
+  //    left, and that slide turns the car left
+  //  - steering right counteracts it (countersteer), lifting lets it straighten up
+  //  - all of it is capped by the grip of the clay: carry too much speed or gas
+  //    and the car pushes up the track toward the cushion
+  _easy(dt, inp, sm, mu, crr, bank, aIn) {
+    const P = this.p, surf = this.surface;
+    const thr = clamp(inp.throttle, 0, 1), brk = clamp(inp.brake, 0, 1), steer = clamp(inp.steer, -1, 1);
+    const wrap = (a) => (a > Math.PI ? a - 2 * Math.PI : a < -Math.PI ? a + 2 * Math.PI : a);
+    let c = Math.cos(this.th), s = Math.sin(this.th);
+    let vx = this.u * c - this.v * s, vz = this.u * s + this.v * c;
+    const sp = Math.hypot(vx, vz);
+    const fwd = this.u;
+    let ang = sp > 0.5 ? Math.atan2(vz, vx) : this.th;
+    const sf = clamp((sp - 4) / 10, 0, 1);
+
+    // ---- slide angle (nose left of the direction of travel) ----
+    const loose = clamp(1.95 - mu / 1.3, 0.6, 1.15);          // slicker clay = steps out easier
+    const cornering = clamp(Math.abs(this._pathRate || 0) / 0.4, 0, 1);
+    let slideT = thr * (0.14 + 0.8 * cornering) * loose        // gas: rear steps out, more so mid-corner
+      + Math.max(0, -steer) * 0.22 * cornering                   // turning in sharpens it
+      - Math.max(0, steer) * 0.3;                                // countersteer catches it
+    slideT = clamp(slideT, -0.12, this.assists ? 0.7 : 0.95) * sf;
+    this._slide = (this._slide || 0) + (slideT - (this._slide || 0)) * Math.min(1, dt * (slideT > (this._slide || 0) ? 2.6 : 3.4));
+    const slide = this._slide;
+
+    // ---- how fast the path turns ----
+    const steerRate = steer * (0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
+    let turn = steerRate - slide * 1.6 - 0.04 * sf;   // + right, - left (stagger pulls left)
+    if (fwd < 0) turn = -steer * 0.8;
+    const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 1.8);
+    let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));
+    if (sp > this.speedLimit) aDrive = 0;
+    // grip of the clay, minus what wheelspin is using up
+    const aCap = Math.sqrt(Math.max(0.1, (mu * G * loadMul) ** 2 - (aDrive * 0.55) ** 2));
+    this.pushing = sp * Math.abs(turn) > aCap;
+    if (this.pushing && sp > 1) turn = Math.sign(turn) * aCap / sp;
+    if (sp < 3) turn *= sp / 3;
+    ang = wrap(ang + turn * dt);
+
+    // ---- speed ----
+    let speed = fwd < 0 ? -sp : sp;
+    speed += aDrive * Math.cos(slide) * dt;
+    const drag = (0.5 * 1.2 * P.CdA * sp * sp) / P.mass + crr * G + 2.2 * Math.abs(Math.sin(slide))
+      + brk * mu * G * 0.8 + (this.surfaceKind === 'marbles' ? 1.2 : 0);
+    if (speed > 0) speed = Math.max(0, speed - drag * dt);
+    else speed = Math.min(0, speed + drag * dt);
+    if (brk > 0.3 && thr < 0.05 && speed < 0.8) speed = Math.max(speed - 3 * dt, -4); // back up
+    vx = Math.cos(ang) * Math.abs(speed) * Math.sign(speed || 1);
+    vz = Math.sin(ang) * Math.abs(speed) * Math.sign(speed || 1);
+    if (speed < 0) { vx = -Math.cos(this.th) * -speed; vz = -Math.sin(this.th) * -speed; }
+
+    // banking + cushion push the car down the track
+    vx += -sm.nx * aIn * dt; vz += -sm.nz * aIn * dt;
+
+    // cushion: choppy conditions can still hook you
+    this.hookCooldown = Math.max(0, this.hookCooldown - dt);
+    const lumpy = surf.prep.lumpy;
+    const vOut = vx * sm.nx + vz * sm.nz;
+    this.onCushion = this.surfaceKind === 'cushion' ? 1 : 0;
+    if ((this.surfaceKind === 'cushion' || this.surfaceKind === 'marbles') && lumpy > 0.5 && surf.cush > 0.4 && vOut > 3.6 && this.hookCooldown <= 0) {
+      this._slide -= 0.18 * (vOut - 3.6) * lumpy; // the cushion snaps the car straight / to the right
+      vx *= 0.96; vz *= 0.96;
+      this.hookCooldown = 1.0;
+      this.events.push({ type: 'hook', strength: vOut });
+    }
+
+    // ---- heading follows the path, minus the slide ----
+    const newAng = Math.hypot(vx, vz) > 0.5 ? Math.atan2(vz, vx) : ang;
+    const prevTh = this.th;
+    this.th = speed >= 0 ? wrap(newAng - this._slide) : this.th + turn * dt;
+    this.w = wrap(this.th - prevTh) / dt;
+    this._pathRate = this._lastAng !== undefined && sp > 2 ? clamp(wrap(newAng - this._lastAng) / dt, -3, 3) : 0;
+    this._lastAng = newAng;
+    c = Math.cos(this.th); s = Math.sin(this.th);
+    this.u = vx * c + vz * s;
+    this.v = -vx * s + vz * c;
+    this.beta = this._slide;
+    this.spin = clamp((thr - 0.3) * loose * 2.2 + this._slide, 0, 1.5) * sf;
+    this.slip = Math.abs(this._slide);
+    // front wheels: driver input plus the countersteer you see in a slide
+    this.delta += (clamp(steer * 0.3 + this._slide * 0.75, -0.42, 0.42) - this.delta) * Math.min(1, dt * 10);
+
+    this.x += vx * dt; this.z += vz * dt;
+    this._walls(sm, vx, vz);
+
+    const wheelTarget = this.u + this.spin * 9;
+    this.rearWheelSpeed += (wheelTarget - this.rearWheelSpeed) * Math.min(1, dt * 10);
+    this.frontWheelSpeed = this.u;
     const rpmT = clamp(Math.abs(this.rearWheelSpeed) * P.rpmPerMps, 2300, 9400);
     this.rpm += (rpmT - this.rpm) * Math.min(1, dt * 12);
     this.throttle = thr;

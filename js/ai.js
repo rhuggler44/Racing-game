@@ -100,6 +100,7 @@ export class AICar {
     this.wobble = Math.random() * 100;
     this.rpm = 3000;
     this.laneOffset = Math.random();
+    this.slideStyle = 0.8 + Math.random() * 0.4;
   }
 }
 
@@ -213,7 +214,9 @@ export class AIField {
 
       // visual slide angle: nose points to the inside in the corners
       const latAcc = c.v * c.v * sm.k / Math.max(0.2, fac);
-      const slideT = clamp(latAcc / 140, 0, 0.42) * (0.75 + 0.25 * Math.sin(c.S * 0.07 + c.wobble));
+      // sprint cars run the corners sideways: nose to the inside, more on corner exit
+      const exitGas = sm.k > 0.002 && c.v < vT ? 0.08 : 0;
+      const slideT = (clamp(latAcc / 62, 0, 0.55) + exitGas) * (0.8 + 0.2 * Math.sin(c.S * 0.07 + c.wobble)) * (c.slideStyle || 1);
       c.slide += (slideT - c.slide) * Math.min(1, dt * 3);
       c.heading = Math.atan2(sm.tz, sm.tx) + Math.atan2(c.dVel, Math.max(c.v, 3)) - c.slide;
       c.rpm += (clamp(c.v * 172 + (acc > 0 ? 700 : 0), 2600, 9200) - c.rpm) * Math.min(1, dt * 6);

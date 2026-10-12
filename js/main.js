@@ -13,7 +13,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // ---------------- settings ----------------
 const DEFAULTS = {
-  controls: 'tilt', tiltRange: 25, invert: false, assists: true, camera: 'chase', quality: 'high', volume: 0.9,
+  controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', camera: 'chase', quality: 'high', volume: 0.9,
   laps: 25, field: 22, difficulty: 'pro', startPos: 'random', prep: 'dialed', hotPrep: 'dialed', time: 'night',
 };
 const store = {
@@ -135,7 +135,7 @@ async function startSession(mode) {
   await ensureCars(drivers);
   session = new Session({
     track, surface, mode, laps: settings.laps, fieldSize: settings.field, difficulty: settings.difficulty,
-    startPos: settings.startPos, drivers: DRIVERS, player: PLAYER, assists: settings.assists,
+    startPos: settings.startPos, drivers: DRIVERS, player: PLAYER, assists: settings.assists, handling: settings.handling,
   });
   if (!isRace) session.bestLap = store.get(`lps.best.${prep}`, Infinity) || Infinity;
   session.hotPrep = prep;
@@ -144,6 +144,7 @@ async function startSession(mode) {
     if (pb) store.set(`lps.best.${prep}`, lt);
   };
   session.onGreen = () => { sound.beep(1200, 0.4); input.recenter(); };
+  session.onHandover = () => { sound.beep(1200, 0.3); input.recenter(); };
   session.onDone = () => setTimeout(showResults, 1500);
   session.onContact = (s) => sound.hit(s * 0.6);
   lastSessionOpts = mode;
@@ -168,7 +169,7 @@ function setCam(m) {
     playerMesh.userData.helmet.visible = m !== 'cockpit';
     playerMesh.userData.shoulders.visible = m !== 'cockpit';
   }
-  camera.fov = m === 'cockpit' ? 74 : 62;
+  camera.fov = m === 'cockpit' ? 64 : 62;
   camera.updateProjectionMatrix();
 }
 
@@ -407,11 +408,11 @@ function updateCamera(dt) {
   const car = session.car, mesh = playerMesh;
   if (camMode === 'cockpit') {
     mesh.updateMatrixWorld();
-    _v.set(0, 1.3, -0.36); mesh.localToWorld(_v);
+    _v.set(0, 1.22, -0.3); mesh.localToWorld(_v); // low, right behind the hood bubble
     const shake = Math.min(1, car.speed / 40) * 0.012;
     _v.y += (Math.random() - 0.5) * shake;
     camera.position.copy(_v);
-    _tgt.set(0, 0.95, 12); mesh.localToWorld(_tgt);
+    _tgt.set(0, 1.0, 12); mesh.localToWorld(_tgt);
     camera.lookAt(_tgt);
     return;
   }
@@ -481,7 +482,7 @@ function renderSession(dt) {
   }
   ud.rearRot = (ud.rearRot || 0) + (car.rearWheelSpeed / 0.45) * dt * (paused ? 0 : 1);
   ud.frontRot = (ud.frontRot || 0) + (car.frontWheelSpeed / 0.33) * dt * (paused ? 0 : 1);
-  poseCar(playerMesh, car.delta + 0.012, ud.rearRot, ud.frontRot);
+  poseCar(playerMesh, car.delta, ud.rearRot, ud.frontRot);
   const fx = Math.cos(car.th), fz = Math.sin(car.th);
   if (!paused && !car.flipped) {
     const mul = car.surfaceKind === 'marbles' || car.surfaceKind === 'cushion' ? 1.6 : car.surfaceKind === 'grass' ? 0.3 : 1;
@@ -498,7 +499,7 @@ function renderSession(dt) {
       track.pos(c.S, c.d, p);
       placeCar(mesh, p.x, p.z, c.heading, c.S, c.d);
       const w = c.wheelRot;
-      poseCar(mesh, -c.slide * 0.6, w, w * 1.35);
+      poseCar(mesh, c.slide * 0.7, w, w * 1.35); // countersteer
       const dd = Math.hypot(p.x - car.x, p.z - car.z);
       if (dd < nearest) { nearest = dd; nearRpm = c.rpm; }
       if (!paused && dd < 90) {
