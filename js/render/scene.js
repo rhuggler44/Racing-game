@@ -28,6 +28,7 @@ export class TrackScene {
     this._buildPits();
     this._buildTrees();
     this._buildFlagstand();
+    this._buildTireMarkers();
     this.surfaceVersion = -1;
     this.updateSurface(true);
   }
@@ -143,7 +144,8 @@ export class TrackScene {
     const img = x.createImageData(w, h);
     const r = rng(3);
     // Indiana red clay: dark and red when tacky, orange-tan as it dries out
-    const tacky = [122, 60, 34], dry = [176, 116, 74], cushion = [104, 50, 28], marbles = [156, 96, 60];
+    // Lincoln Park clay: brown and a little red when tacky, tan as it dries out (from in-car video)
+    const tacky = [116, 72, 46], dry = [168, 128, 92], cushion = [96, 60, 38], marbles = [150, 112, 80];
     const rows = [];
     for (let j = 0; j < h; j++) {
       const dn = (j + 0.5) / h;
@@ -161,6 +163,10 @@ export class TrackScene {
         const s = (i / w) * t.L;
         let n = (r() - 0.5) * 16;
         n += Math.sin(j * 1.7 + Math.sin(s * 0.05) * 2) * 3;
+        // ruts / tire tracks running around the track
+        const rut = Math.sin(j * 2.3 + Math.sin(s * 0.031 + j * 0.2) * 3.0 + Math.sin(s * 0.11) * 0.6);
+        if (rut > 0.82) n -= (rut - 0.82) * 70;
+        else if (rut < -0.9) n += 6;
         if (mr > 0.1 && r() < 0.25 * mr) n += (r() - 0.3) * 40;
         if (cr > 0.2) n += Math.sin(s * 0.9 + j) * 6 * cr;
         const k = (j * w + i) * 4;
@@ -451,6 +457,28 @@ export class TrackScene {
       im.setColorAt(i, c.setHSL(0.24 + r() * 0.08, 0.45, 0.2 + r() * 0.1));
     }
     this.group.add(im, tr);
+  }
+
+  // big white tires lying on the inside edge of the turns (turn markers)
+  _buildTireMarkers() {
+    const t = this.track, W = t.W;
+    const geo = new THREE.TorusGeometry(0.62, 0.3, 10, 18);
+    const mat = new THREE.MeshLambertMaterial({ color: '#e8e6df' });
+    const zs = t.turnZones;
+    const spots = [];
+    for (const zi of [2, 6]) {
+      const a0 = zs[zi].s0, a1 = zs[zi].s1;
+      spots.push(a0 + (a1 - a0) * 0.3, a0 + (a1 - a0) * 0.72);
+    }
+    const p = {};
+    for (const s of spots) {
+      t.pos(s, -W / 2 - 1.0, p);
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(p.x, t.height(s, -W / 2 - 1.0) + 0.42, p.z);
+      m.rotation.y = -Math.atan2(p.tz, p.tx) + Math.PI / 2;
+      m.rotation.x = 0.25;
+      this.group.add(m);
+    }
   }
 
   _buildFlagstand() {

@@ -223,7 +223,7 @@ function aiAtlas(drv) {
   });
   // a little clay on everything
   for (let i = 0; i < 220; i++) { x.fillStyle = `rgba(150,85,45,${0.1 + Math.random() * 0.15})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 2.5 + 0.4, 0, 7); x.fill(); }
-  return { canvas: c, chassis: '#151515', rim: '#cfd3d6', number: numCol === '#ffffff' && base === '#ffffff' ? '#111111' : numCol, numberOutline: base === '#ffffff' ? '#ffffff' : '#111111', helmet: accent, coverLeft: false };
+  return { canvas: c, chassis: '#151515', roof: body, rim: '#cfd3d6', number: numCol === '#ffffff' && base === '#ffffff' ? '#111111' : numCol, numberOutline: base === '#ffffff' ? '#ffffff' : '#111111', helmet: accent, coverLeft: false };
 }
 
 async function playerAtlas() {
@@ -231,7 +231,7 @@ async function playerAtlas() {
   const c = canvas(ATLAS, ATLAS), x = c.getContext('2d');
   x.fillStyle = '#0b0b0e'; x.fillRect(0, 0, ATLAS, ATLAS);
   if (img) x.drawImage(img, 0, 0, ATLAS, ATLAS);
-  return { canvas: c, chassis: '#e2b862', rim: '#d9dde0', number: '#ffffff', numberOutline: '#0b0b0e', numberShadow: '#e2b862', helmet: '#f2cf7e', coverLeft: true };
+  return { canvas: c, chassis: '#e2b862', roof: '#0e0e10', rim: '#d9dde0', number: '#ffffff', numberOutline: '#0b0b0e', numberShadow: '#e2b862', helmet: '#f2cf7e', coverLeft: true };
 }
 
 // number decals (like iRacing's number layer)
@@ -314,9 +314,16 @@ function chassisParts(liv) {
     chrome.push(pipe([[RIGHT * 0.2, 0.55, z0], [RIGHT * 0.34, 0.52, z0 - 0.06], [RIGHT * 0.42, 0.44, z0 - 0.3], [RIGHT * 0.42, 0.41, 0.1 - i * 0.02]], 0.026, false, 6));
   }
   chrome.push(pipe([[RIGHT * 0.42, 0.41, 0.12], [RIGHT * 0.42, 0.4, -0.4], [RIGHT * 0.46, 0.42, -0.8]], 0.06));
+  // roof panel over the cage (seen across the top of the in-car view)
+  const roofGeo = panel(6, 6, (u, v) => {
+    const z = lerp(0.06, -0.7, u), sx = v * 2 - 1;
+    const y = lerp(1.6, 1.665, u) + 0.03 * (1 - sx * sx) - (u < 0.1 ? (0.1 - u) * 0.6 : 0);
+    return [-sx * lerp(0.28, 0.27, u), y, z];
+  }, [0, 0, 1, 1], () => [0, 0]);
+  const roof = new THREE.Mesh(roofGeo, new THREE.MeshPhongMaterial({ color: liv.roof, shininess: 60, side: THREE.DoubleSide }));
   const blackMat = new THREE.MeshPhongMaterial({ color: liv.chassis, shininess: 40, specular: '#444444' });
   const chromeMat = new THREE.MeshPhongMaterial({ color: '#c9ced3', shininess: 120, specular: '#ffffff' });
-  return [new THREE.Mesh(merge(black), blackMat), new THREE.Mesh(merge(chrome), chromeMat)];
+  return [new THREE.Mesh(merge(black), blackMat), new THREE.Mesh(merge(chrome), chromeMat), roof];
 }
 
 function engine() {
@@ -354,12 +361,15 @@ function cockpitInterior(helmetColor) {
   head.position.set(RIGHT * 0.16, 1.33, -0.5); g.add(head);
   const floor = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.04, 0.74), new THREE.MeshLambertMaterial({ color: '#202020' }));
   floor.position.set(0, 0.34, -0.26); g.add(floor);
+  // driver's body (hidden in the cockpit view so it doesn't block the screen)
   const suit = new THREE.MeshPhongMaterial({ color: '#e9e9e9', shininess: 20 });
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.4, 10), suit);
-  torso.position.set(0, 1.04, -0.47); torso.rotation.x = 0.2; g.add(torso);
+  const torso = new THREE.Group();
+  g.add(torso);
+  const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.4, 10), suit);
+  chest.position.set(0, 1.04, -0.47); chest.rotation.x = 0.2; torso.add(chest);
   for (const s of [LEFT, RIGHT]) {
     const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.42, 6), suit);
-    arm.position.set(s * 0.16, 1.08, -0.24); arm.rotation.x = Math.PI / 2 - 0.35; g.add(arm);
+    arm.position.set(s * 0.16, 1.02, -0.26); arm.rotation.x = Math.PI / 2 - 0.5; torso.add(arm);
   }
   const helmet = new THREE.Group();
   helmet.add(new THREE.Mesh(new THREE.SphereGeometry(0.142, 18, 14), new THREE.MeshPhongMaterial({ color: helmetColor, shininess: 110, specular: '#888888' })));
@@ -367,7 +377,7 @@ function cockpitInterior(helmetColor) {
   helmet.position.set(0, 1.33, -0.38);
   g.add(helmet);
   const sw = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.016, 6, 18), new THREE.MeshLambertMaterial({ color: '#141414' }));
-  sw.position.set(0, 1.08, -0.06); sw.rotation.x = -0.45; g.add(sw);
+  sw.position.set(0, 0.97, -0.1); sw.rotation.x = -0.55; g.add(sw);
   return { group: g, helmet, torso };
 }
 

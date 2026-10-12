@@ -169,7 +169,7 @@ function setCam(m) {
     playerMesh.userData.helmet.visible = m !== 'cockpit';
     playerMesh.userData.shoulders.visible = m !== 'cockpit';
   }
-  camera.fov = m === 'cockpit' ? 74 : 62;
+  camera.fov = m === 'cockpit' ? 64 : 62;
   camera.updateProjectionMatrix();
 }
 
@@ -408,11 +408,11 @@ function updateCamera(dt) {
   const car = session.car, mesh = playerMesh;
   if (camMode === 'cockpit') {
     mesh.updateMatrixWorld();
-    _v.set(0, 1.3, -0.36); mesh.localToWorld(_v);
+    _v.set(0, 1.22, -0.3); mesh.localToWorld(_v); // low, right behind the hood bubble
     const shake = Math.min(1, car.speed / 40) * 0.012;
     _v.y += (Math.random() - 0.5) * shake;
     camera.position.copy(_v);
-    _tgt.set(0, 0.95, 12); mesh.localToWorld(_tgt);
+    _tgt.set(0, 1.0, 12); mesh.localToWorld(_tgt);
     camera.lookAt(_tgt);
     return;
   }
