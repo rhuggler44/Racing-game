@@ -1,0 +1,35 @@
+// Placeholder field. Swap in real names/numbers/colors any time.
+// colors: [body, accent, number]
+export const PLAYER = {
+  name: 'You',
+  number: '44',
+  sponsor: 'RACO Marketing',
+  colors: ['#0b0b0e', '#f2cf7e', '#ffffff'],
+  isPlayer: true,
+};
+
+export const DRIVERS = [
+  { name: 'Cody Barrows',    number: '4',   colors: ['#c8102e', '#ffffff', '#ffffff'], rating: 1.5 },
+  { name: 'Jace Whitfield',  number: '11',  colors: ['#0033a0', '#ffd100', '#ffffff'], rating: 1.2 },
+  { name: 'Mason Kreider',   number: '7K',  colors: ['#f5f5f5', '#111111', '#111111'], rating: 1.0 },
+  { name: 'Tanner Ostrom',   number: '21',  colors: ['#ff6a13', '#1a1a1a', '#ffffff'], rating: 0.9 },
+  { name: 'Logan Pruitt',    number: '5',   colors: ['#ffd100', '#1a1a1a', '#1a1a1a'], rating: 0.8 },
+  { name: 'Brody Hensel',    number: '98',  colors: ['#00843d', '#ffffff', '#ffffff'], rating: 0.6 },
+  { name: 'Wyatt Calloway',  number: '17W', colors: ['#6a1b9a', '#f2f2f2', '#ffffff'], rating: 0.5 },
+  { name: 'Dalton Reese',    number: '3R',  colors: ['#111111', '#d50000', '#ffffff'], rating: 0.4 },
+  { name: 'Grady Simmons',   number: '22',  colors: ['#00a3e0', '#ffffff', '#ffffff'], rating: 0.3 },
+  { name: 'Colt Ferris',     number: '81',  colors: ['#8b5a2b', '#ffe0a3', '#ffffff'], rating: 0.2 },
+  { name: 'Ethan Vogel',     number: '2E',  colors: ['#e91e63', '#ffffff', '#ffffff'], rating: 0.1 },
+  { name: 'Hunter Lasko',    number: '19',  colors: ['#1b5e20', '#ffd100', '#ffd100'], rating: 0.0 },
+  { name: 'Ryder Mattingly', number: '9',   colors: ['#ffffff', '#0033a0', '#0033a0'], rating: 0.0 },
+  { name: 'Kyle Dunaway',    number: '57',  colors: ['#424242', '#ff6a13', '#ffffff'], rating: -0.1 },
+  { name: 'Bryce Talbert',   number: '10',  colors: ['#b71c1c', '#ffd100', '#ffd100'], rating: -0.2 },
+  { name: 'Austin Kemp',     number: '33',  colors: ['#0d47a1', '#c8102e', '#ffffff'], rating: -0.3 },
+  { name: 'Nolan Briggs',    number: '6',   colors: ['#ffeb3b', '#0033a0', '#0033a0'], rating: -0.4 },
+  { name: 'Cash Holloway',   number: '71',  colors: ['#4a148c', '#ffd100', '#ffd100'], rating: -0.5 },
+  { name: 'Drew Sutter',     number: '26',  colors: ['#009688', '#ffffff', '#ffffff'], rating: -0.6 },
+  { name: 'Zane Purcell',    number: '1Z',  colors: ['#f57f17', '#111111', '#111111'], rating: -0.7 },
+  { name: 'Riley Hoch',      number: '15',  colors: ['#263238', '#80deea', '#ffffff'], rating: -0.8 },
+  { name: 'Gavin Stroud',    number: '40',  colors: ['#ad1457', '#ffffff', '#ffffff'], rating: -0.9 },
+  { name: 'Isaac Rinker',    number: '88',  colors: ['#2e7d32', '#ffffff', '#ffffff'], rating: -1.0 },
+];

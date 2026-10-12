@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Indiana Sprints: Lincoln Park</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sprints">
+  <meta name="theme-color" content="#0b0b0e">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icon-180.png">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud" class="hidden">
+    <div class="hud-tl">
+      <div id="hud-pos" class="big"></div>
+      <div id="hud-lap"></div>
+    </div>
+    <div class="hud-tc">
+      <div id="hud-flag" class="flag"></div>
+      <div id="hud-time" class="mono"></div>
+      <div id="hud-best" class="mono small"></div>
+    </div>
+    <div class="hud-tr">
+      <button id="btn-cam" class="icon-btn" aria-label="Switch camera">CAM</button>
+      <button id="btn-pause" class="icon-btn" aria-label="Pause">II</button>
+      <canvas id="minimap" width="150" height="100"></canvas>
+    </div>
+    <div class="hud-bc">
+      <div id="hud-speed" class="mono"></div>
+      <div id="hud-track" class="small"></div>
+    </div>
+    <div id="hud-msg"></div>
+    <div id="tower"></div>
+    <button id="btn-reset" class="hidden">RESET CAR</button>
+    <div id="steer-zone"></div>
+    <div id="pedal-brake" class="pedal"><span>BRAKE</span></div>
+    <div id="pedal-gas" class="pedal"><span>GAS</span><i>slide up for more</i></div>
+  </div>
+
+  <!-- ===== MENUS ===== -->
+  <div id="menu" class="screen">
+    <div class="panel title-panel">
+      <div class="eyebrow">Indiana Sprints · 410 Non-Wing</div>
+      <h1>Lincoln Park<br>Speedway</h1>
+      <div class="sub">Putnamville, Indiana · 5/16-mile clay oval</div>
+      <div class="btn-col">
+        <button class="btn primary" data-go="hotlaps">Hot Laps</button>
+        <button class="btn primary" data-go="race-setup">Feature Race</button>
+        <button class="btn" data-go="settings">Settings</button>
+      </div>
+      <div id="menu-best" class="small muted"></div>
+    </div>
+  </div>
+
+  <div id="race-setup" class="screen hidden">
+    <div class="panel">
+      <h2>Feature Race</h2>
+      <div class="opt"><label>Laps</label><div class="seg" data-key="laps" data-vals="10,15,25" data-labels="10,15,25"></div></div>
+      <div class="opt"><label>Field</label><div class="seg" data-key="field" data-vals="12,16,22" data-labels="12,16,22 cars"></div></div>
+      <div class="opt"><label>Competition</label><div class="seg" data-key="difficulty" data-vals="rookie,pro,outlaw" data-labels="Rookie,Pro,Outlaw"></div></div>
+      <div class="opt"><label>Start</label><div class="seg" data-key="startPos" data-vals="random,front,middle,back" data-labels="Draw,Pole,Middle,Tail"></div></div>
+      <div class="opt"><label>Time</label><div class="seg" data-key="time" data-vals="night,day" data-labels="Night,Day"></div></div>
+      <div class="opt"><label>Track</label><div class="seg" data-key="prep" data-vals="dialed,heavy,slick" data-labels="Dialed In,Heavy (Rain),Dry Slick"></div></div>
+      <div id="prep-desc" class="small muted"></div>
+      <div class="btn-row">
+        <button class="btn" data-go="menu">Back</button>
+        <button class="btn primary" data-go="race">Start Race</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings" class="screen hidden">
+    <div class="panel">
+      <h2>Settings</h2>
+      <div class="opt"><label>Steering</label><div class="seg" data-key="controls" data-vals="tilt,touch" data-labels="Tilt,Touch drag"></div></div>
+      <div class="opt"><label>Tilt range</label><div class="seg" data-key="tiltRange" data-vals="18,25,35" data-labels="Twitchy,Normal,Relaxed"></div></div>
+      <div class="opt"><label>Invert tilt</label><div class="seg" data-key="invert" data-vals="false,true" data-labels="No,Yes"></div></div>
+      <div class="opt"><label>Driving aids</label><div class="seg" data-key="assists" data-vals="true,false" data-labels="On,Off (pro)"></div></div>
+      <div class="opt"><label>Camera</label><div class="seg" data-key="camera" data-vals="chase,cockpit" data-labels="Chase,Cockpit"></div></div>
+      <div class="opt"><label>Time of day</label><div class="seg" data-key="time" data-vals="night,day" data-labels="Night,Day"></div></div>
+      <div class="opt"><label>Graphics</label><div class="seg" data-key="quality" data-vals="low,high" data-labels="Smooth,Sharp"></div></div>
+      <div class="opt"><label>Sound</label><div class="seg" data-key="volume" data-vals="0,0.5,0.9" data-labels="Off,Low,Loud"></div></div>
+      <div class="opt"><label>Hot lap track</label><div class="seg" data-key="hotPrep" data-vals="dialed,heavy,slick" data-labels="Dialed In,Heavy (Rain),Dry Slick"></div></div>
+      <div class="btn-row"><button class="btn primary" data-go="menu">Done</button></div>
+    </div>
+  </div>
+
+  <div id="pause" class="screen hidden">
+    <div class="panel">
+      <h2>Paused</h2>
+      <div class="btn-col">
+        <button class="btn primary" data-act="resume">Resume</button>
+        <button class="btn" data-act="recenter">Re-center Tilt</button>
+        <button class="btn" data-act="reset-car">Reset Car</button>
+        <button class="btn" data-act="restart">Restart</button>
+        <button class="btn" data-act="quit">Quit to Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="results" class="screen hidden">
+    <div class="panel wide">
+      <h2 id="results-title">Results</h2>
+      <div id="results-list"></div>
+      <div class="btn-row">
+        <button class="btn" data-act="quit">Menu</button>
+        <button class="btn primary" data-act="restart">Race Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tilt-prompt" class="screen hidden">
+    <div class="panel">
+      <h2>Hold it like a steering wheel</h2>
+      <p>Turn your phone sideways and hold it level in front of you. Tilt left and right to steer.</p>
+      <p class="small muted">Right thumb: gas (slide your thumb up the pedal for more). Left thumb: brake.</p>
+      <div class="btn-row"><button class="btn primary" data-act="tilt-go">I'm ready</button></div>
+    </div>
+  </div>
+
+  <div id="rotate" class="screen hidden">
+    <div class="panel"><div class="rot-icon">⟳</div><h2>Turn your phone sideways</h2><p class="muted">Lincoln Park is best in landscape.</p></div>
+  </div>
+
+  <div id="loading" class="screen"><div class="panel"><h2>Loading Lincoln Park…</h2></div></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
