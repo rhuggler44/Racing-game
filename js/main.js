@@ -198,7 +198,7 @@ function initSegs() {
       const refresh = () => seg.querySelectorAll('button').forEach((x, j) => x.classList.toggle('on', parse(vals[j]) === settings[key]));
       b.addEventListener('click', () => {
         settings[key] = pv; saveSettings(); segRefreshers.forEach((f) => f());
-        if (key === 'volume') sound.setVolume(pv);
+        if (key === 'volume') { sound.setVolume(pv); if (pv > 0 && state !== 'menu') sound.start(); }
         if (key === 'quality') resize();
         if (key === 'prep') $('prep-desc').textContent = PREPS[pv].desc;
         if (key === 'hotPrep') refreshMenu();
@@ -552,4 +552,4 @@ ensureCars([]).then(() => {
   // park it on the front stretch for the menu backdrop
   placeCar(playerMesh, track.x[0], track.z[0], 0, 0, -3);
 });
-window.__lps = { renderer, track, surface, get session() { return session; }, settings, startSession, setCam };
+window.__lps = { renderer, sound, track, surface, get session() { return session; }, settings, startSession, setCam };
