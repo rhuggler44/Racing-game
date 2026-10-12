@@ -4,9 +4,12 @@ export class Sound {
 
   // call from a user gesture (required on iPhone)
   start() {
+    // sound off: never touch the phone's audio, so your music keeps playing
+    if (this.vol <= 0) return;
     if (this.ctx) { this.ctx.resume(); return; }
     try {
-      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      // 'ambient' mixes with other apps (Spotify, Apple Music) instead of pausing them
+      if (navigator.audioSession) navigator.audioSession.type = 'ambient';
     } catch (e) { /* not supported */ }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
@@ -107,7 +110,17 @@ export class Sound {
     o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.02);
   }
 
-  setVolume(v) { this.vol = v; }
+  setVolume(v) {
+    this.vol = v;
+    if (v <= 0 && this.ctx) {
+      // fully release the audio session so iOS hands it back to your music
+      this.ctx.close();
+      this.ctx = null;
+      this.master = null;
+    } else if (this.master) {
+      this.master.gain.value = v;
+    }
+  }
   suspend() { if (this.ctx) this.ctx.suspend(); }
   resume() { if (this.ctx) this.ctx.resume(); }
 }
