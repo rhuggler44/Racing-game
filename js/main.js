@@ -144,6 +144,7 @@ async function startSession(mode) {
     if (pb) store.set(`lps.best.${prep}`, lt);
   };
   session.onGreen = () => { sound.beep(1200, 0.4); input.recenter(); };
+  session.onHandover = () => { sound.beep(1200, 0.3); input.recenter(); };
   session.onDone = () => setTimeout(showResults, 1500);
   session.onContact = (s) => sound.hit(s * 0.6);
   lastSessionOpts = mode;

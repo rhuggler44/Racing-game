@@ -1,7 +1,7 @@
 // Game session: hot laps or a feature race (rolling 2-wide start, green /
 // white / checkered, positions, lap times, car contact). No rendering here.
-import { Car } from './physics.js';
-import { AIField } from './ai.js';
+import { Car, autopilot } from './physics.js';
+import { AIField, SpeedProfile } from './ai.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -30,6 +30,8 @@ export class Session {
     } else {
       this.phase = 'running';
       this.car.reset(track.L * 0.55, -2, 18);
+      this.profile = new SpeedProfile(track, surface);
+      this.message('Out lap: the car drives itself. You take over at the line.', 4);
       this.lapStartTime = null;
       surface.setLaps(0);
     }
@@ -62,7 +64,7 @@ export class Session {
     this.car.speedLimit = this.paceSpeed + 1.5;
     this.paceLeadS = this.gridLeadS;
     this.surface.setLaps(0);
-    this.message('Pace lap: two by two. Hold your spot.', 4);
+    this.message('Pace lap: the car drives itself. You take over at the green.', 4);
   }
 
   message(text, dur = 2.5, big = false) { this.messages.push({ text, dur, big, t: 0 }); }
@@ -120,7 +122,10 @@ export class Session {
     const prevS = car.S;
 
     // ---- player physics (fixed substeps) ----
-    const inp = this.playerStatus === 'dnf' ? { steer: 0, throttle: 0, brake: 1 } : input;
+    let inp = this.playerStatus === 'dnf' ? { steer: 0, throttle: 0, brake: 1 } : input;
+    // the computer drives the pace lap / out lap; you get the car at the green / the line
+    this.autoDriving = !car.flipped && (this.mode === 'race' ? this.phase === 'pace' : this.lapStartTime == null && !this._handedOver);
+    if (this.autoDriving) inp = this._autoInput();
     const sub = 2, h = dt / sub;
     for (let i = 0; i < sub; i++) car.step(h, inp);
 
@@ -151,6 +156,20 @@ export class Session {
     this.messages = this.messages.filter((m) => m.t < m.dur);
   }
 
+  _autoInput() {
+    const t = this.track, car = this.car;
+    if (this.mode === 'race') {
+      const slotS = this.paceLeadS - this.playerSlot.row * 8.5;
+      const v = this.paceSpeed + clamp((slotS - car.S) * 0.6, -6, 6);
+      return autopilot(car, t, this.playerSlot.d, v);
+    }
+    // out lap: a brisk lap down low so you hit the line at speed
+    this.profile.update();
+    let v = 99;
+    for (let o = 4; o < 45; o += 3) { const vp = this.profile.speed(car.s + o, 0.22) * 0.85; v = Math.min(v, Math.sqrt(vp * vp + 2 * 9 * Math.max(0, o - 8))); }
+    return autopilot(car, t, -4.5, v);
+  }
+
   _hotlapUpdate(dt, prevS) {
     const L = this.track.L, car = this.car;
     if (Math.floor(car.S / L) > Math.floor(prevS / L)) {
@@ -163,7 +182,9 @@ export class Session {
         this.message(`${lt.toFixed(3)}${pb ? '  BEST' : ''}`, 3, true);
         this.onLap && this.onLap(lt, pb);
       } else {
-        this.message('Hot lap: GO!', 1.5);
+        this.message('GO! You have the car.', 1.8, true);
+        this._handedOver = true;
+        this.onHandover && this.onHandover();
       }
       this.lapStartTime = this.time;
       this.surface.setLaps(this.playerLaps.length * 1.0);
