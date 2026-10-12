@@ -29,6 +29,8 @@ const saveSettings = () => store.set('lps.settings', settings);
 const canvasEl = $('game');
 const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true, powerPreference: 'high-performance' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#070a14');
 scene.fog = new THREE.Fog('#0b0f1c', 140, 650);
@@ -38,6 +40,14 @@ scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff3dc', 1.7);
 sun.position.set(40, 120, 30);
 scene.add(sun);
+scene.add(sun.target);
+// shadows only around the player's car, so they stay cheap
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 300 });
+sun.shadow.bias = -0.0008;
+sun.shadow.normalBias = 0.02;
+const sunOffset = new THREE.Vector3(40, 120, 30);
 const ambient = new THREE.AmbientLight('#ffffff', 0.25);
 scene.add(ambient);
 function applyTime() {
@@ -47,12 +57,13 @@ function applyTime() {
   scene.fog.color.set(day ? '#b9d3ea' : '#0b0f1c');
   scene.fog.near = day ? 220 : 140; scene.fog.far = day ? 1100 : 650;
   hemi.color.set(day ? '#dcebff' : '#c9d6ff'); hemi.intensity = day ? 1.1 : 0.9;
-  sun.intensity = day ? 2.6 : 1.7; sun.position.set(day ? 120 : 40, day ? 160 : 120, day ? -60 : 30);
+  sun.intensity = day ? 2.6 : 1.7; sunOffset.set(day ? 120 : 40, day ? 160 : 120, day ? -60 : 30);
   ambient.intensity = day ? 0.35 : 0.25;
 }
 
 function applyQuality() {
   const dpr = window.devicePixelRatio || 1;
+  sun.castShadow = settings.quality !== 'low';
   renderer.setPixelRatio(settings.quality === 'low' ? Math.min(dpr, 1.25) : Math.min(dpr, 2));
 }
 function resize() {
@@ -497,6 +508,8 @@ function renderSession(dt) {
     }
   }
   updateCamera(dt);
+  sun.target.position.copy(playerMesh.position);
+  sun.position.copy(playerMesh.position).add(sunOffset);
   if (window.__spec) { // debug: spectator view at track position [s, d, height]
     const [ss, dd, hh] = window.__spec; const p0 = track.pos(ss, dd, {});
     camera.position.set(p0.x, track.height(ss, dd) + hh, p0.z);
@@ -504,7 +517,7 @@ function renderSession(dt) {
   }
   if (window.__freecam) { // debug: orbit view of the player's car
     _v.set(...window.__freecam); playerMesh.localToWorld(_v);
-    camera.position.copy(_v); _tgt.set(0, 0.7, 0); playerMesh.localToWorld(_tgt); camera.lookAt(_tgt);
+    camera.position.copy(_v); _tgt.set(0, 0.65, 0); playerMesh.localToWorld(_tgt); camera.lookAt(_tgt);
   }
 
   // stuck / wrong way

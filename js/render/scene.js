@@ -97,6 +97,7 @@ export class TrackScene {
         .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= 0.6 + 0.55 * texture2D(detailMap, vDUv).r;');
     };
     this.surfMesh = new THREE.Mesh(geo, mat);
+    this.surfMesh.receiveShadow = true;
     this.group.add(this.surfMesh);
   }
 
