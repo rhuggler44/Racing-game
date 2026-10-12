@@ -56,6 +56,7 @@ export class Car {
     this.flipped = false;
     this.speedLimit = Infinity; // pace-lap governor
     this.flipSpeed = 17;
+    this.flipCause = null;
     this.cushionTimer = 0;
     this.hookCooldown = 0;
     this.onCushion = 0;
@@ -82,10 +83,21 @@ export class Car {
     this.dn = dn;
 
     // surface
-    let mu, crr = P.Crr, bank = sm.bank, berm = 0;
+    let mu, crr = P.Crr, bank = sm.bank, berm = 0, aOut = 0;
+    const eOut = this.d - W / 2;
     if (this.d < -W / 2 - 1.5) { mu = 0.62; crr = 0.12; bank = 0; this.surfaceKind = 'grass'; }
     else if (this.d < -W / 2) { mu = surf.grip(0) * 0.85; crr = 0.05; bank = 0; this.surfaceKind = 'apron'; }
-    else {
+    else if (eOut > 0.4) {
+      // off the outside edge: grass, and the ground falls away
+      mu = 0.6; crr = 0.09; bank = 0; this.surfaceKind = 'offtrack';
+      const slope = (t.outsideY(this.s, eOut) - t.outsideY(this.s, eOut + 0.5)) / 0.5;
+      aOut = G * Math.sin(Math.atan(Math.max(0, slope)));
+      if (t.zones(this.s).kind === 'drop' && eOut > 3.2 && !this.flipped) {
+        this.flipped = true;
+        this.flipCause = 'bank';
+        this.events.push({ type: 'flip', strength: this.speed, cause: 'bank' });
+      }
+    } else {
       mu = surf.grip(Math.min(dn, 1));
       berm = surf.berm(dn);
       this.surfaceKind = dn > surf.cPos + 0.02 ? 'marbles' : dn > surf.cPos - surf.cW ? 'cushion' : 'track';
@@ -96,7 +108,7 @@ export class Car {
     const rx = -fz, rz = fx;
 
     // external horizontal accelerations: banking slope + cushion berm, both push inward
-    const aIn = G * Math.sin(bank) * Math.cos(bank) + berm;
+    const aIn = G * Math.sin(bank) * Math.cos(bank) + berm - aOut;
     const gx = -sm.nx * aIn, gz = -sm.nz * aIn;
     const aExtF = gx * fx + gz * fz;
     const aExtR = gx * rx + gz * rz;
@@ -220,7 +232,8 @@ export class Car {
     const tsm = t.sample(pr.s, this._sm);
     const psi = this.th - Math.atan2(tsm.tz, tsm.tx);
     const ext = P.halfWidth * Math.abs(Math.cos(psi)) + P.halfLength * Math.abs(Math.sin(psi));
-    const outer = W / 2 + 0.3, inner = -W / 2 - 7;
+    // outer wall depends on the section of track; inside is the infield berm
+    const outer = W / 2 + t.wallE(pr.s), inner = -W / 2 - 2.6;
     let pen = 0, nSign = 0;
     if (pr.d + ext > outer) { pen = pr.d + ext - outer; nSign = 1; }
     else if (pr.d - ext < inner) { pen = inner - (pr.d - ext); nSign = -1; }
@@ -231,8 +244,10 @@ export class Car {
     if (vn <= 0) return;
     // impact
     const tvx = vx - vn * nx, tvz = vz - vn * nz;
-    const keep = Math.max(0.55, 1 - 0.035 * vn);
-    const nvx = tvx * keep - 0.25 * vn * nx, nvz = tvz * keep - 0.25 * vn * nz;
+    const soft = nSign < 0 || t.zones(pr.s).kind === 'flat'; // clay berm inside, pit fence past 3-4
+    const keep = soft ? Math.max(0.7, 1 - 0.02 * vn) : Math.max(0.55, 1 - 0.035 * vn);
+    const rest = soft ? 0.1 : 0.25;
+    const nvx = tvx * keep - rest * vn * nx, nvz = tvz * keep - rest * vn * nz;
     const c = Math.cos(this.th), s = Math.sin(this.th);
     this.u = nvx * c + nvz * s;
     this.v = -nvx * s + nvz * c;
@@ -244,7 +259,7 @@ export class Car {
     if (Math.abs(dth) < Math.PI / 2) this.th += dth * 0.35;
     this.w *= 0.4;
     this.events.push({ type: 'wall', strength: vn, outer: nSign > 0 });
-    if (nSign > 0 && vn > this.flipSpeed) {
+    if (nSign > 0 && !soft && vn > this.flipSpeed) {
       this.flipped = true;
       this.events.push({ type: 'flip', strength: vn });
     }

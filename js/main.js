@@ -14,7 +14,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 // ---------------- settings ----------------
 const DEFAULTS = {
   controls: 'tilt', tiltRange: 25, invert: false, assists: true, camera: 'chase', quality: 'high', volume: 0.9,
-  laps: 25, field: 22, difficulty: 'pro', startPos: 'random', prep: 'dialed', hotPrep: 'dialed',
+  laps: 25, field: 22, difficulty: 'pro', startPos: 'random', prep: 'dialed', hotPrep: 'dialed', time: 'night',
 };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -33,11 +33,23 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color('#070a14');
 scene.fog = new THREE.Fog('#0b0f1c', 140, 650);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.05, 2000);
-scene.add(new THREE.HemisphereLight('#c9d6ff', '#3b2a1c', 0.9));
+const hemi = new THREE.HemisphereLight('#c9d6ff', '#3b2a1c', 0.9);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff3dc', 1.7);
 sun.position.set(40, 120, 30);
 scene.add(sun);
-scene.add(new THREE.AmbientLight('#ffffff', 0.25));
+const ambient = new THREE.AmbientLight('#ffffff', 0.25);
+scene.add(ambient);
+function applyTime() {
+  const day = settings.time === 'day';
+  trackScene.setTime(settings.time);
+  scene.background.set(day ? '#9cc4ea' : '#070a14');
+  scene.fog.color.set(day ? '#b9d3ea' : '#0b0f1c');
+  scene.fog.near = day ? 220 : 140; scene.fog.far = day ? 1100 : 650;
+  hemi.color.set(day ? '#dcebff' : '#c9d6ff'); hemi.intensity = day ? 1.1 : 0.9;
+  sun.intensity = day ? 2.6 : 1.7; sun.position.set(day ? 120 : 40, day ? 160 : 120, day ? -60 : 30);
+  ambient.intensity = day ? 0.35 : 0.25;
+}
 
 function applyQuality() {
   const dpr = window.devicePixelRatio || 1;
@@ -58,6 +70,7 @@ const track = buildTrack(LINCOLN_PARK);
 const surface = new Surface(track, settings.prep);
 const trackScene = new TrackScene(track, surface, settings.quality);
 scene.add(trackScene.group);
+applyTime();
 const dust = new Dust(settings.quality === 'low' ? 500 : 900);
 scene.add(dust.points);
 
@@ -123,6 +136,7 @@ async function startSession(mode) {
   session.onDone = () => setTimeout(showResults, 1500);
   session.onContact = (s) => sound.hit(s * 0.6);
   lastSessionOpts = mode;
+  applyTime();
   trackScene.updateSurface(true);
   playerMesh.userData.flipT = 0;
   hideAll();
@@ -157,6 +171,7 @@ function refreshMenu() {
   $('menu-best').textContent = b ? `Your best hot lap (${PREPS[settings.hotPrep].label}): ${b.toFixed(3)}s · Track record 12.276s` : 'Track record: 12.276s (Brady Bacon, 2018)';
 }
 
+const segRefreshers = [];
 function initSegs() {
   document.querySelectorAll('.seg').forEach((seg) => {
     const key = seg.dataset.key;
@@ -170,14 +185,16 @@ function initSegs() {
       const pv = parse(v);
       const refresh = () => seg.querySelectorAll('button').forEach((x, j) => x.classList.toggle('on', parse(vals[j]) === settings[key]));
       b.addEventListener('click', () => {
-        settings[key] = pv; saveSettings(); refresh();
+        settings[key] = pv; saveSettings(); segRefreshers.forEach((f) => f());
         if (key === 'volume') sound.setVolume(pv);
         if (key === 'quality') resize();
         if (key === 'prep') $('prep-desc').textContent = PREPS[pv].desc;
         if (key === 'hotPrep') refreshMenu();
+        if (key === 'time') applyTime();
       });
       seg.appendChild(b);
       refresh();
+      segRefreshers.push(refresh);
     });
   });
   $('prep-desc').textContent = PREPS[settings.prep].desc;
@@ -333,7 +350,7 @@ function updateHud(dt) {
   $('hud-speed').innerHTML = `${mph}<small> MPH</small>`;
   const wear = surface.wear;
   const cond = wear < 0.2 ? 'Tacky' : wear < 0.5 ? 'Drying' : 'Slick';
-  const where = car.surfaceKind === 'cushion' ? ' · ON THE CUSHION' : car.surfaceKind === 'marbles' ? ' · IN THE MARBLES' : car.surfaceKind === 'grass' ? ' · INFIELD' : '';
+  const where = car.surfaceKind === 'cushion' ? ' · ON THE CUSHION' : car.surfaceKind === 'marbles' ? ' · IN THE MARBLES' : car.surfaceKind === 'grass' ? ' · INFIELD' : car.surfaceKind === 'offtrack' ? ' · OFF THE TRACK' : '';
   $('hud-track').textContent = `${PREPS[surface.prepId].label} · ${cond}${where}`;
   if (s.mode === 'race') {
     const pos = s.playerPosition();
@@ -439,8 +456,18 @@ function renderSession(dt) {
     const t = Math.min(ud.flipT / 1.4, 1);
     roll = t * Math.PI * 3;
   } else ud.flipT = 0;
-  placeCar(playerMesh, car.x, car.z, car.th, car.s, car.d, roll);
-  if (car.flipped) playerMesh.position.y += Math.sin(Math.min(ud.flipT / 1.4, 1) * Math.PI) * 2.6 + (ud.flipT > 1.4 ? 1.1 : 0);
+  if (car.flipped && car.flipCause === 'bank') {
+    // tumbling down the hill past turns 1-2
+    const k = Math.min(ud.flipT / 2.2, 1);
+    const sm2 = track.sample(car.s, {});
+    const dd = car.d + k * 9;
+    const px = car.x + sm2.nx * k * 9, pz = car.z + sm2.nz * k * 9;
+    placeCar(playerMesh, px, pz, car.th + k * 1.5, car.s, dd, k * Math.PI * 4);
+    playerMesh.position.y = track.height(car.s, dd) + 1.0 + Math.abs(Math.sin(k * Math.PI * 4)) * 0.8;
+  } else {
+    placeCar(playerMesh, car.x, car.z, car.th, car.s, car.d, roll);
+    if (car.flipped) playerMesh.position.y += Math.sin(Math.min(ud.flipT / 1.4, 1) * Math.PI) * 2.6 + (ud.flipT > 1.4 ? 1.1 : 0);
+  }
   ud.rearRot = (ud.rearRot || 0) + (car.rearWheelSpeed / 0.45) * dt * (paused ? 0 : 1);
   ud.frontRot = (ud.frontRot || 0) + (car.frontWheelSpeed / 0.33) * dt * (paused ? 0 : 1);
   poseCar(playerMesh, car.delta + 0.012, ud.rearRot, ud.frontRot);
@@ -470,6 +497,11 @@ function renderSession(dt) {
     }
   }
   updateCamera(dt);
+  if (window.__spec) { // debug: spectator view at track position [s, d, height]
+    const [ss, dd, hh] = window.__spec; const p0 = track.pos(ss, dd, {});
+    camera.position.set(p0.x, track.height(ss, dd) + hh, p0.z);
+    const tgt = track.pos(ss + 25, 0, {}); camera.lookAt(tgt.x, 1, tgt.z);
+  }
   if (window.__freecam) { // debug: orbit view of the player's car
     _v.set(...window.__freecam); playerMesh.localToWorld(_v);
     camera.position.copy(_v); _tgt.set(0, 0.7, 0); playerMesh.localToWorld(_tgt); camera.lookAt(_tgt);

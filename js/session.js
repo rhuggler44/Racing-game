@@ -125,11 +125,12 @@ export class Session {
 
     for (const e of car.events) {
       if (e.type === 'flip') {
+        const what = e.cause === 'bank' ? `OVER THE BANK IN TURN ${this.track.turnAt(car.s) || 2}!` : 'FLIPPED!';
         if (this.mode === 'race') {
           this.playerStatus = 'dnf';
-          this.message('FLIPPED! Your night is over.', 4, true);
+          this.message(`${what} Your night is over.`, 4, true);
         } else {
-          this.message('FLIPPED!', 2.5, true);
+          this.message(what, 2.5, true);
           this._flipReset = 2.5;
         }
       } else if (e.type === 'hook') {

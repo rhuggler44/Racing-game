@@ -111,11 +111,47 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
       const b = track.sample(s, _h).bank;
       const e = d + W / 2;
       let y;
-      if (e <= 0) y = Math.max(-0.35, e * 0.06); // apron falls away slightly into infield
+      if (e <= 0) y = infieldY(-e);
       else if (e <= W) y = e * Math.tan(b);
-      else y = W * Math.tan(b);
+      else y = track.outsideY(s, e - W);
       if (surface && e > 0 && e < W) y += surface.ridge(e / W);
       return y;
+    },
+    // What's beyond the outside edge, by section of track (Lincoln Park):
+    //  front stretch: wall right at the edge, grass bank + grandstands behind it
+    //  turns 1-2:     no wall, the track drops off down a hill
+    //  backstretch:   wall set well back with a short drop down to it
+    //  turns 3-4:     no wall, flatter runoff where cars come on from the pits
+    zones(s, out = _z) {
+      s = track.wrap(s);
+      const f = (a, b, x) => clamp((x - a) / (b - a), 0, 1);
+      // front <-> drop around turn 1 entry, drop <-> back at turn 2 exit,
+      // back <-> flat at turn 3 entry, flat <-> front at turn 4 exit
+      const t1 = f(48, 62, s), t2 = f(198, 212, s), t3 = f(292, 306, s), t4 = f(438, 452, s);
+      out.front = (1 - t1) + t4;
+      out.drop = t1 * (1 - t2);
+      out.back = t2 * (1 - t3);
+      out.flat = t3 * (1 - t4);
+      out.kind = out.front >= 0.5 ? 'front' : out.drop >= 0.5 ? 'drop' : out.back >= 0.5 ? 'back' : 'flat';
+      return out;
+    },
+    // distance past the outer edge where a wall is (Infinity = none)
+    wallE(s) {
+      const k = track.zones(s).kind;
+      return k === 'front' ? 0.3 : k === 'back' ? 9 : k === 'flat' ? 26 : Infinity;
+    },
+    // terrain height e meters past the outer edge
+    outsideY(s, e) {
+      const z = track.zones(s, _z2);
+      const h0 = W * Math.tan(track.sample(s, _h).bank);
+      let y = 0;
+      if (z.front) y += z.front * (h0 + (e < 0.6 ? 0 : 0.4 + Math.min(e - 0.6, 12) * 0.2));
+      if (z.drop) y += z.drop * Math.max(-2.5, h0 - 0.05 * Math.min(e, 1.5) - Math.max(0, e - 1.5) * 0.62);
+      if (z.back) y += z.back * (e < 9 ? h0 - 0.2 * e : h0 - 1.8);
+      if (z.flat) y += z.flat * Math.max(h0 - 1.6, h0 - 0.06 * e);
+      // everything settles to the surrounding ground far out
+      const far = clamp((e - 30) / 40, 0, 1);
+      return y + (-2.5 - y) * far * (z.front > 0.5 ? 0.3 : 1);
     },
     // project world point to (s, d); hint = last index for local search
     project(px, pz, hint = -1, out = {}) {
@@ -154,11 +190,18 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
       return 0;
     },
   };
-  const _h = {}, _p = {};
+  const _h = {}, _p = {}, _z = {}, _z2 = {};
   return track;
 }
 
 const GRIP_SCALE = 1.36;
+// inside the track: apron, then a low clay berm ringing the infield, then grass
+export const APRON = 1.6, BERM_IN = 2.0, BERM_OUT = 3.2;
+function infieldY(x) {
+  if (x < APRON) return -x * 0.05;
+  if (x < BERM_OUT) { const t = (x - APRON) / (BERM_OUT - APRON); return -APRON * 0.05 + Math.sin(t * Math.PI) * 0.45; }
+  return -0.12;
+}
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 

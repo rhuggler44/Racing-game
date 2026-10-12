@@ -23,7 +23,8 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
   - *Dialed In:* a solid bottom and a fast top, so both lines race well.
   - *After Heavy Rain:* tacky and fast early, but the cushion gets tall and choppy and can hook you.
   - *Dry Slick:* throttle control wins.
-- Your **#44 RACO Marketing** car, built from your iRacing paint file (`assets/paint/`).
+- **Lincoln Park layout, modeled on photos of the track:** a wall on the front stretch only, no wall in turns 1-2 (jump the cushion and you go over the bank), a backstretch wall set back off the track, flat runoff out to the pits in turns 3-4, and a clay berm ringing the infield. Night or day.
+- Your **#44 RACO Marketing** car. The iRacing paint file (`assets/paint/raco-44-iracing-scheme.jpg`) is mapped panel by panel onto the car (see `PAINT_REGIONS` in `js/render/carModel.js`), with a gold chassis and cage, painted left-side mud covers and the HUGGLER name plate.
 - Placeholder drivers in `js/drivers.js`. Edit names, numbers and colors there.
 
 ## Project layout
