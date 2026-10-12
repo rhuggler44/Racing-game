@@ -12,6 +12,7 @@ export class Session {
     this.laps = laps; this.player = player;
     this.car = new Car(track, surface);
     this.car.assists = assists;
+    this.car.handling = opts.handling || 'easy';
     this.time = 0; this.raceTime = 0;
     this.messages = [];
     this.playerLaps = []; this.bestLap = Infinity; this.lastLap = 0;

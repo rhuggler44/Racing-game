@@ -9,6 +9,10 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 2. Tap **Share → Add to Home Screen**. It now launches full-screen like an app.
 3. Turn the phone sideways. The first time, tap **I'm ready** and allow motion access so tilt steering works.
 
+### Handling
+- **Easy (default):** you drive it with the gas. Turn in, then get on the throttle: the stagger and wheelspin kick the rear out and the car slides left around the corner. Steer right to catch or hold the slide, and lift to straighten it up. Too much speed or gas and you push up the track toward the cushion, or over the bank in 1-2.
+- **Realistic:** the full tire-physics model (Settings → Handling).
+
 ### Controls
 - **Steer:** tilt the phone like a steering wheel. Re-center from the pause menu if it drifts.
 - **Gas (right thumb):** the higher your thumb sits on the pedal, the more throttle. Feather it off the corners or you'll spin the rear tires and get sideways.
