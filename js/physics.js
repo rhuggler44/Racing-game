@@ -1,0 +1,274 @@
+// Player car: a 410 non-wing sprint car on dirt. Planar bicycle model with
+// friction-circle rear tires (throttle steer), banking, cushion and walls.
+// Pure JS so it can run in node for tuning.
+import { G } from './track.js';
+
+export const SPRINT_410 = {
+  mass: 650,          // kg with driver (~1425 lb)
+  Iz: 600,            // yaw inertia
+  a: 1.17,            // CG -> front axle
+  b: 0.96,            // CG -> rear axle
+  h: 0.42,            // CG height
+  power: 640000,      // W (~860 hp at the wheels)
+  maxDrive: 12000,    // N, low-speed traction/torque cap
+  CdA: 0.85,
+  Crr: 0.024,
+  maxSteer: 0.42,     // rad at the front wheels
+  stagger: 0.012,     // rad of built-in left pull
+  tireB: 7.0,
+  tireC: 1.45,
+  rearGrip: 1.05,
+  halfWidth: 0.98,
+  halfLength: 1.75,
+  rpmPerMps: 172,     // direct drive: ~9000 rpm at 52 m/s
+};
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const tire = (al, B, C) => Math.sin(C * Math.atan(B * al));
+
+export class Car {
+  constructor(track, surface, params = SPRINT_410) {
+    this.track = track;
+    this.surface = surface;
+    this.p = { ...params };
+    this.assists = true;
+    this.events = [];
+    this._sm = {};
+    this._pr = {};
+    this.reset(0, 0, 0);
+  }
+
+  reset(s, d, speed = 0) {
+    const t = this.track, sm = t.pos(s, d, {});
+    this.x = sm.x; this.z = sm.z;
+    this.th = Math.atan2(sm.tz, sm.tx);
+    this.u = speed; this.v = 0; this.w = 0;
+    this.ax = 0;
+    this.delta = 0;
+    this.idx = Math.round(t.wrap(s) / t.ds) % t.N;
+    this.s = t.wrap(s); this.d = d;
+    this.lap = 0;
+    this.S = this.s;
+    this.spin = 0; this.slip = 0; this.beta = 0;
+    this.rearWheelSpeed = speed;
+    this.frontWheelSpeed = speed;
+    this.rpm = 2500;
+    this.flipped = false;
+    this.speedLimit = Infinity; // pace-lap governor
+    this.flipSpeed = 17;
+    this.cushionTimer = 0;
+    this.hookCooldown = 0;
+    this.onCushion = 0;
+    this.surfaceKind = 'track';
+  }
+
+  get speed() { return Math.hypot(this.u, this.v); }
+
+  // inp: { steer -1..1 (right +), throttle 0..1, brake 0..1 }
+  step(dt, inp) {
+    if (this.flipped) return;
+    const P = this.p, t = this.track, surf = this.surface;
+    const m = P.mass, WB = P.a + P.b, W = t.W;
+
+    // where are we on the track
+    const pr = t.project(this.x, this.z, this.idx, this._pr);
+    const prevS = this.s;
+    this.idx = pr.i; this.s = pr.s; this.d = pr.d;
+    if (this.s - prevS < -t.L / 2) this.lap++;
+    else if (this.s - prevS > t.L / 2) this.lap--;
+    this.S = this.lap * t.L + this.s;
+    const sm = t.sample(this.s, this._sm);
+    const dn = (this.d + W / 2) / W;
+    this.dn = dn;
+
+    // surface
+    let mu, crr = P.Crr, bank = sm.bank, berm = 0;
+    if (this.d < -W / 2 - 1.5) { mu = 0.62; crr = 0.12; bank = 0; this.surfaceKind = 'grass'; }
+    else if (this.d < -W / 2) { mu = surf.grip(0) * 0.85; crr = 0.05; bank = 0; this.surfaceKind = 'apron'; }
+    else {
+      mu = surf.grip(Math.min(dn, 1));
+      berm = surf.berm(dn);
+      this.surfaceKind = dn > surf.cPos + 0.02 ? 'marbles' : dn > surf.cPos - surf.cW ? 'cushion' : 'track';
+    }
+    this.mu = mu;
+
+    const fx = Math.cos(this.th), fz = Math.sin(this.th);
+    const rx = -fz, rz = fx;
+
+    // external horizontal accelerations: banking slope + cushion berm, both push inward
+    const aIn = G * Math.sin(bank) * Math.cos(bank) + berm;
+    const gx = -sm.nx * aIn, gz = -sm.nz * aIn;
+    const aExtF = gx * fx + gz * fz;
+    const aExtR = gx * rx + gz * rz;
+
+    let u = this.u, v = this.v, w = this.w;
+    const uu = Math.max(Math.abs(u), 2);
+    const beta = Math.atan2(v, uu);
+    this.beta = beta;
+
+    // vertical load: banking adds load when turning into it
+    const turnIn = u > 0 && w < 0 ? -u * w : 0;
+    const loadMul = clamp(Math.cos(bank) + turnIn * Math.sin(bank) / G, 0.6, 1.8);
+    const Fz = m * G * loadMul;
+    const Fzf = clamp(Fz * P.b / WB - m * this.ax * P.h / WB, Fz * 0.15, Fz * 0.85);
+    const Fzr = Fz - Fzf;
+
+    // steering (slightly less lock at speed), stagger pulls left
+    let delta = clamp(inp.steer, -1, 1) * P.maxSteer / (1 + Math.max(u, 0) / 70);
+    if (this.assists && u > 4) delta += clamp(0.5 * beta, -0.22, 0.22); // countersteer help
+    delta -= P.stagger;
+    delta = clamp(delta, -P.maxSteer, P.maxSteer);
+    // steering rack has finite speed
+    const maxRate = 4.0 * dt;
+    this.delta += clamp(delta - this.delta, -maxRate, maxRate);
+    delta = this.delta;
+
+    const dir = u >= 0 ? 1 : -1;
+    const af = Math.atan2(v + P.a * w, uu) - delta * dir;
+    const ar = Math.atan2(v - P.b * w, uu);
+
+    // brakes / drive
+    const thr = clamp(inp.throttle, 0, 1), brk = clamp(inp.brake, 0, 1);
+    const sgnU = clamp(u / 0.6, -1, 1);
+    const Fbrake = brk * mu * Fz * 0.85;
+    let Fd = thr * Math.min(P.maxDrive, P.power / Math.max(Math.abs(u), 4));
+    if (Math.abs(u) > this.speedLimit) Fd = 0;
+    const Crear = mu * P.rearGrip * Fzr;
+    if (this.assists) Fd = Math.min(Fd, Crear * 1.25);
+    // reverse when stopped and holding brake
+    let Frev = 0;
+    if (brk > 0.3 && thr < 0.05 && u < 0.6) Frev = -2200 * brk;
+
+    let Fxr = Fd - Fbrake * 0.55 * sgnU + (u < 0.6 ? Frev : 0);
+    let spin = 0;
+    if (Math.abs(Fxr) > Crear) {
+      spin = Math.abs(Fxr) / Crear - 1;
+      Fxr = Math.sign(Fxr) * Crear * (spin > 0.35 ? 0.86 : 0.94);
+    }
+    const latFrac = Math.max(Math.sqrt(Math.max(0, 1 - (Fxr / Crear) ** 2)), this.assists ? 0.6 : 0.45);
+    const Fyr = -Crear * latFrac * tire(ar, P.tireB, P.tireC);
+    const Fyf = -mu * Fzf * tire(af, P.tireB, P.tireC);
+    const Fxf = -Fbrake * 0.45 * sgnU;
+
+    const drag = 0.5 * 1.2 * P.CdA * u * Math.abs(u);
+    const roll = crr * m * G * sgnU;
+    const cd = Math.cos(delta), sd = Math.sin(delta);
+    const Fx = Fxr + Fxf * cd - Fyf * sd - drag - roll;
+    const Fy = Fyf * cd + Fxf * sd + Fyr;
+    let Mz = P.a * (Fyf * cd + Fxf * sd) - P.b * Fyr;
+
+    // stability assist: stop the car from swapping ends
+    if (this.assists && u > 3) {
+      const lim = 0.5;
+      if (Math.abs(beta) > lim) Mz += 9000 * (beta - Math.sign(beta) * lim);
+    }
+
+    const axB = Fx / m + aExtF;
+    const ayB = Fy / m + aExtR;
+    u += (axB + v * w) * dt;
+    v += (ayB - u * w) * dt;
+    w += (Mz / P.Iz) * dt;
+    this.ax = this.ax + (Fx / m - this.ax) * Math.min(1, dt * 8);
+
+    // low-speed settling
+    if (Math.abs(u) < 3) {
+      const k = 1 - Math.min(1, dt * (3 - Math.abs(u)) * 1.5);
+      v *= k; w *= k;
+    }
+    if (thr < 0.02 && brk < 0.3 && Math.abs(u) < 0.25) u *= 1 - Math.min(1, dt * 4);
+
+    // cushion: choppy conditions can hook the car
+    this.hookCooldown = Math.max(0, this.hookCooldown - dt);
+    const lumpy = surf.prep.lumpy;
+    const vOut = (u * fx + v * rx) * sm.nx + (u * fz + v * rz) * sm.nz;
+    this.onCushion = this.surfaceKind === 'cushion' ? 1 : 0;
+    if (this.surfaceKind === 'cushion' || this.surfaceKind === 'marbles') {
+      const lump = surf.lumps(this.s);
+      w += lump * lumpy * surf.cush * 1.6 * dt * (Math.abs(u) / 30);
+      if (vOut > 3.2 && this.hookCooldown <= 0 && lumpy > 0.5 && surf.cush > 0.4) {
+        w += 0.35 * (vOut - 3.2) * lumpy;
+        u *= 0.95;
+        this.hookCooldown = 0.8;
+        this.events.push({ type: 'hook', strength: vOut });
+      }
+    }
+    if (this.surfaceKind === 'marbles') u -= Math.sign(u) * 1.2 * dt;
+
+    this.u = u; this.v = v; this.w = w;
+    this.spin = spin; this.slip = Math.abs(ar);
+    this.th += w * dt;
+    if (this.th > Math.PI) this.th -= 2 * Math.PI; else if (this.th < -Math.PI) this.th += 2 * Math.PI;
+
+    const vx = u * Math.cos(this.th) - v * Math.sin(this.th);
+    const vz = u * Math.sin(this.th) + v * Math.cos(this.th);
+    this.x += vx * dt; this.z += vz * dt;
+
+    this._walls(sm, vx, vz);
+
+    // wheel speeds / rpm for audio + visuals
+    const wheelTarget = u + (spin > 0 ? Math.min(spin, 1.5) * 9 + 4 : 0) * (Fd > 0 ? 1 : 0);
+    this.rearWheelSpeed += (wheelTarget - this.rearWheelSpeed) * Math.min(1, dt * 10);
+    this.frontWheelSpeed = u;
+    const rpmT = clamp(Math.abs(this.rearWheelSpeed) * P.rpmPerMps, 2300, 9400);
+    this.rpm += (rpmT - this.rpm) * Math.min(1, dt * 12);
+    this.throttle = thr;
+  }
+
+  _walls(sm, vx, vz) {
+    const t = this.track, W = t.W, P = this.p;
+    const pr = t.project(this.x, this.z, this.idx, this._pr);
+    const tsm = t.sample(pr.s, this._sm);
+    const psi = this.th - Math.atan2(tsm.tz, tsm.tx);
+    const ext = P.halfWidth * Math.abs(Math.cos(psi)) + P.halfLength * Math.abs(Math.sin(psi));
+    const outer = W / 2 + 0.3, inner = -W / 2 - 7;
+    let pen = 0, nSign = 0;
+    if (pr.d + ext > outer) { pen = pr.d + ext - outer; nSign = 1; }
+    else if (pr.d - ext < inner) { pen = inner - (pr.d - ext); nSign = -1; }
+    if (!pen) return;
+    const nx = tsm.nx * nSign, nz = tsm.nz * nSign;
+    this.x -= nx * pen; this.z -= nz * pen;
+    const vn = vx * nx + vz * nz;
+    if (vn <= 0) return;
+    // impact
+    const tvx = vx - vn * nx, tvz = vz - vn * nz;
+    const keep = Math.max(0.55, 1 - 0.035 * vn);
+    const nvx = tvx * keep - 0.25 * vn * nx, nvz = tvz * keep - 0.25 * vn * nz;
+    const c = Math.cos(this.th), s = Math.sin(this.th);
+    this.u = nvx * c + nvz * s;
+    this.v = -nvx * s + nvz * c;
+    // wall straightens the car out
+    const along = Math.atan2(tvz, tvx);
+    let dth = along - this.th;
+    while (dth > Math.PI) dth -= 2 * Math.PI;
+    while (dth < -Math.PI) dth += 2 * Math.PI;
+    if (Math.abs(dth) < Math.PI / 2) this.th += dth * 0.35;
+    this.w *= 0.4;
+    this.events.push({ type: 'wall', strength: vn, outer: nSign > 0 });
+    if (nSign > 0 && vn > this.flipSpeed) {
+      this.flipped = true;
+      this.events.push({ type: 'flip', strength: vn });
+    }
+  }
+
+  // collision impulse from another car (world-space push + velocity change)
+  push(dx, dz, dvx, dvz) {
+    this.x += dx; this.z += dz;
+    const c = Math.cos(this.th), s = Math.sin(this.th);
+    this.u += dvx * c + dvz * s;
+    this.v += -dvx * s + dvz * c;
+  }
+}
+
+// Simple autopilot used for headless tuning tests and attract mode.
+export function autopilot(car, track, laneD, vTarget, look = 9) {
+  const sm = track.pos(car.s + look, laneD, {});
+  const dx = sm.x - car.x, dz = sm.z - car.z;
+  const ang = Math.atan2(dz, dx);
+  let err = ang - (car.th + Math.atan2(car.v, Math.max(car.u, 2)) * 0.8);
+  while (err > Math.PI) err -= 2 * Math.PI;
+  while (err < -Math.PI) err += 2 * Math.PI;
+  const steer = clamp(err * 2.4, -1, 1);
+  const dv = vTarget - car.u;
+  const feather = clamp(1 - (Math.abs(car.beta) - 0.14) * 4, 0.2, 1);
+  return { steer, throttle: clamp(0.25 + dv * 0.35, 0, 1) * feather, brake: clamp(-dv * 0.25 - 0.3, 0, 1) };
+}
