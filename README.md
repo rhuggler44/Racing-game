@@ -1,4 +1,4 @@
-# Indiana Sprints: Lincoln Park Speedway
+# USAC Racing: Lincoln Park Speedway
 
 A 410 non-wing sprint car racing game for your phone's browser, starting with
 **Lincoln Park Speedway**, the 5/16-mile clay oval in Putnamville, Indiana.
