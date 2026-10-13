@@ -256,6 +256,87 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #34 Shane Cottle: white car with a maroon cage and chassis, double maroon
+  // swoosh down the sides, maroon hood scoop, Lucas Oil Products badge, maroon
+  // 34 outlined white on the nose, slate-blue COTTLE plate, black wheels
+  cottle34(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f4f3f0', maroon = '#8c1d3c', dark = '#5a1023', slate = '#3d5b87', black = '#151515';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // Lucas Oil Products badge: white shield, blue banner
+    const lucas = (cx, cy, s) => {
+      x.fillStyle = slate; x.beginPath(); x.roundRect(cx - s, cy - s * 0.5, s * 2, s, s * 0.2); x.fill();
+      x.fillStyle = white; x.beginPath(); x.roundRect(cx - s * 0.92, cy - s * 0.42, s * 1.84, s * 0.84, s * 0.16); x.fill();
+      txt('LUCAS', cx, cy - s * 0.06, s * 0.42, slate, { italic: true, maxW: s * 1.6 });
+      txt('OIL PRODUCTS INC.', cx, cy + s * 0.26, s * 0.15, slate, { weight: 800, maxW: s * 1.6 });
+    };
+    // two maroon swooshes sweeping down from the cockpit toward the nose
+    const swoosh = (w, h, rr, y0) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      // high at the back (right), sweeping down toward the front
+      for (const [off, col, th] of [[0, maroon, 0.11], [0.15, dark, 0.075]]) {
+        x.strokeStyle = col; x.lineWidth = h * th; x.lineCap = 'round';
+        x.beginPath(); x.moveTo(w * 1.02, h * (y0 + off)); x.quadraticCurveTo(w * 0.5, h * (y0 + off - 0.02), w * 0.12, h * (y0 + off + 0.52)); x.stroke();
+      }
+      x.restore();
+    };
+    const hoodSide = (w, h, rr) => {
+      swoosh(w, h, rr, 0.16);
+      lucas(rr ? w * 0.2 : w * 0.8, h * 0.3, h * 0.3);
+      const lows = [['CHALKSTIX', 0.12], ['WIX', 0.42], ['HOOSIER', 0.62]];
+      for (const [t, f] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.86, h * 0.07, black, { weight: 800, maxW: w * 0.14 });
+      x.fillStyle = black; x.fillRect(0, h * 0.94, w, h * 0.06);
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => {
+      txt('34', w * 0.5, h * 0.48, h * 0.72, maroon, { stroke: white, sw: 0.1, maxW: w * 0.6 });
+    };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides (x = 0 is the back): sponsor stack on the tall white panel, swoosh low
+    const cockSide = (w, h) => {
+      const list = [['SRI', 0.12, 0.1], ['SMITH', 0.24, 0.06], ['NOVIX', 0.33, 0.06], ['HOOSIER', 0.42, 0.06]];
+      for (const [t, fy, sz] of list) txt(t, w * 0.15, h * fy, h * sz, black, { italic: true, maxW: w * 0.26 });
+      x.strokeStyle = maroon; x.lineWidth = h * 0.05;
+      x.beginPath(); x.moveTo(w * 0.3, h * 0.62); x.quadraticCurveTo(w * 0.65, h * 0.58, w, h * 0.66); x.stroke();
+      x.strokeStyle = dark; x.lineWidth = h * 0.035;
+      x.beginPath(); x.moveTo(w * 0.34, h * 0.72); x.quadraticCurveTo(w * 0.66, h * 0.68, w, h * 0.76); x.stroke();
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: maroon 34 outlined white and dark maroon
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = maroon; x.fillRect(0, 0, w, h * 0.05);
+      txt('34', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.42, maroon, { stroke: dark, sw: 0.12, maxW: w * 0.32 });
+      txt('COTTLE', rr ? w * 0.2 : w * 0.8, h * 0.3, h * 0.08, maroon, { maxW: w * 0.22 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = maroon; x.fillRect(w * 0.44, 0, w * 0.12, h); });
+    // hood top: the maroon scoop panel over the injectors, white everywhere else
+    P.flat(R.hoodTop, true, (w, h) => {
+      x.fillStyle = maroon; x.beginPath(); x.moveTo(w * 0.58, h * 0.3); x.lineTo(w * 0.96, h * 0.25); x.lineTo(w * 0.96, h * 0.75); x.lineTo(w * 0.58, h * 0.7); x.fill();
+      x.strokeStyle = slate; x.lineWidth = h * 0.015; x.stroke();
+    });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = slate; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('COTTLE', 0, 0, w * 0.6, white, { stroke: black, sw: 0.1, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 450; i++) { x.fillStyle = `rgba(120,85,55,${0.06 + Math.random() * 0.14})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: maroon, roof: maroon, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: slate, coverLeft: false,
+      number: maroon, numberOutline: white, numberShadow: dark, paintedTailNumbers: true,
+    };
+  },
+
   // #23 Halle Richey: pink car, Alliance Bank as the main sponsor (white waving
   // flag logo and serif lettering on the bank's green), white 23 outlined green
   richey23(drv) {
