@@ -107,13 +107,13 @@ export class AICar {
 }
 
 export class AIField {
-  constructor(track, surface, drivers, difficulty = 'pro') {
+  constructor(track, surface, drivers, difficulty = 'pro', skills = null) {
     this.track = track; this.surface = surface;
     this.profile = new SpeedProfile(track, surface);
     this.cars = [];
     const D = DIFFICULTY[difficulty] || DIFFICULTY.pro;
     drivers.forEach((drv, i) => {
-      const skill = (D.pace + (Math.random() - 0.5) * 2 * D.spread + (drv.rating || 0) * 0.01) * (track.def.aiPace || 1);
+      const skill = skills && skills.has(drv) ? skills.get(drv) : (D.pace + (Math.random() - 0.5) * 2 * D.spread + (drv.rating || 0) * 0.01) * (track.def.aiPace || 1);
       const pref = drv.groove ?? (i % 3 === 0 ? 1 : i % 3 === 1 ? -1 : 0);
       this.cars.push(new AICar(drv, skill, pref));
     });

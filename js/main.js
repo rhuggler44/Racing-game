@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { buildTrack, Surface, PREPS, TRACKS, LINCOLN_PARK } from './track.js';
 import { Session } from './session.js';
+import { RaceNight } from './night.js';
 import { DRIVERS, PLAYER } from './drivers.js';
 import { Input } from './input.js';
 import { Sound } from './audio.js';
@@ -139,29 +140,33 @@ function placeCar(mesh, x, z, heading, s, d, roll = 0) {
 }
 
 // ---------------- session control ----------------
-async function startSession(mode) {
+// ev (race night): { kind: 'qual' | 'race', laps, grid, surfaceLaps }
+async function startSession(mode, ev = null) {
   state = 'loading';
   show('loading');
+  if (ev) mode = ev.kind;
   const isRace = mode === 'race';
-  const prep = isRace ? settings.prep : settings.hotPrep;
-  surface.setPrep(prep);
-  const drivers = isRace ? DRIVERS.slice(0, settings.field - 1) : [];
+  const prep = ev ? settings.prep : isRace ? settings.prep : settings.hotPrep;
+  if (!ev || ev.kind === 'qual') surface.setPrep(prep); // a night keeps one surface all night
+  const drivers = ev && ev.grid ? ev.grid.filter((e) => !e.isPlayer).map((e) => e.driver) : isRace ? DRIVERS.slice(0, settings.field - 1) : [];
   await ensureCars(drivers);
   session = new Session({
-    track, surface, mode, laps: settings.laps, fieldSize: settings.field, difficulty: settings.difficulty,
+    track, surface, mode, laps: ev ? ev.laps : settings.laps, fieldSize: settings.field, difficulty: settings.difficulty,
     startPos: settings.startPos, drivers: DRIVERS, player: PLAYER, assists: settings.assists, handling: settings.handling,
+    grid: ev && ev.grid, surfaceLaps: ev ? ev.surfaceLaps : 0, qualLaps: ev ? ev.laps : 2,
   });
-  if (!isRace) session.bestLap = store.get(bestKey(prep), Infinity) || Infinity;
+  if (mode === 'hotlaps') session.bestLap = store.get(bestKey(prep), Infinity) || Infinity;
   session.hotPrep = prep;
+  session.nightEvent = ev;
   session.onLap = (lt, pb) => {
     sound.beep(pb ? 1320 : 990, 0.12);
-    if (pb) store.set(bestKey(prep), lt);
+    if (pb && mode === 'hotlaps') store.set(bestKey(prep), lt);
   };
   session.onGreen = () => { sound.beep(1200, 0.4); input.recenter(); };
   session.onHandover = () => { sound.beep(1200, 0.3); input.recenter(); };
-  session.onDone = () => setTimeout(showResults, 1500);
+  session.onDone = () => setTimeout(ev ? nightEventDone : showResults, ev ? 2500 : 1500);
   session.onContact = (s) => sound.hit(s * 0.6);
-  lastSessionOpts = mode;
+  lastSessionOpts = ev ? { mode, ev } : mode;
   applyTime();
   trackScene.updateSurface(true);
   playerMesh.userData.flipT = 0;
@@ -189,7 +194,7 @@ function setCam(m) {
 }
 
 // ---------------- UI wiring ----------------
-const screens = ['menu', 'race-setup', 'settings', 'pause', 'results', 'tilt-prompt', 'rotate', 'loading'];
+const screens = ['menu', 'race-setup', 'settings', 'pause', 'results', 'tilt-prompt', 'rotate', 'loading', 'night'];
 function hideAll() { screens.forEach((s) => $(s).classList.add('hidden')); }
 function show(id) { hideAll(); $(id).classList.remove('hidden'); if (id === 'menu') refreshMenu(); }
 
@@ -231,17 +236,18 @@ function initSegs() {
 }
 
 let tiltExplained = false;
-function begin(mode) {
+function begin(mode, ev = null) {
   // runs inside the tap handler: unlock audio + motion sensors (iPhone)
   sound.start();
   if (settings.controls === 'tilt' && isTouch && !tiltExplained) {
-    pendingMode = mode;
+    pendingMode = mode; pendingEv = ev;
     show('tilt-prompt');
     return;
   }
   if (settings.controls === 'tilt') input.enableTilt();
-  startSession(mode);
+  startSession(mode, ev);
 }
+let pendingEv = null;
 let pendingMode = null;
 
 document.addEventListener('click', (e) => {
@@ -251,6 +257,9 @@ document.addEventListener('click', (e) => {
     const t = go.dataset.go;
     if (t === 'hotlaps') begin('hotlaps');
     else if (t === 'race') begin('race');
+    else if (t === 'night-setup') showSetup('night');
+    else if (t === 'race-setup') showSetup('race');
+    else if (t === 'night') beginNight();
     else show(t);
   }
   if (act) {
@@ -259,12 +268,17 @@ document.addEventListener('click', (e) => {
       tiltExplained = true;
       input.enableTilt();
       sound.start();
-      startSession(pendingMode || 'hotlaps');
+      startSession(pendingMode || 'hotlaps', pendingEv);
     } else if (a === 'resume') resume();
     else if (a === 'recenter') { input.recenter(); resume(); }
     else if (a === 'reset-car') { session && session.resetPlayer(); resume(); }
-    else if (a === 'restart') { sound.start(); startSession(lastSessionOpts || 'hotlaps'); }
-    else if (a === 'quit') quit();
+    else if (a === 'restart') {
+      sound.start();
+      if (night && night.stage === 'done') beginNight(); // "New Night" from the feature results
+      else if (lastSessionOpts && lastSessionOpts.ev) startSession(null, lastSessionOpts.ev);
+      else startSession(lastSessionOpts || 'hotlaps');
+    } else if (a === 'quit') { night = null; quit(); }
+    else if (a === 'night-go') { sound.start(); const ev = night && night.next(); if (ev) begin(null, ev); }
   }
 });
 $('btn-pause').addEventListener('click', () => pause());
@@ -303,13 +317,81 @@ function quit() {
   show('menu');
 }
 
+// ---------------- race night ----------------
+let night = null;
+function showSetup(kind) {
+  $('setup-title').textContent = kind === 'night' ? 'Race Night' : 'Feature Race';
+  $('setup-night-info').classList.toggle('hidden', kind !== 'night');
+  $('setup-start-opt').classList.toggle('hidden', kind === 'night');
+  $('setup-laps-label').textContent = kind === 'night' ? 'Feature' : 'Laps';
+  const b = $('setup-go');
+  b.dataset.go = kind === 'night' ? 'night' : 'race';
+  b.textContent = kind === 'night' ? 'Start the Night' : 'Start Race';
+  show('race-setup');
+}
+
+function beginNight() {
+  night = new RaceNight({ track, surface, drivers: DRIVERS, player: PLAYER, difficulty: settings.difficulty, featureLaps: settings.laps, fieldSize: settings.field });
+  surface.setPrep(settings.prep);
+  showNight();
+}
+
+const numChip = (d) => `<span class="num" style="background:${d.colors[0]};color:${d.colors[2]};border:1px solid ${d.colors[1]}">${d.number}</span>`;
+const nightRow = (i, e, right = '') => `<div class="r ${e.isPlayer ? 'me' : ''}"><span>${i}</span>${numChip(e.driver)}<span>${e.driver.name}</span><span class="mono">${right}</span></div>`;
+
+// the screen between events: what just happened + what's next
+function showNight() {
+  state = 'night'; paused = true;
+  const n = night, ev = n.next();
+  let title = '', html = '';
+  const steps = ['Qualifying', 'Heat races', 'A-Main'];
+  const at = n.stage === 'qualifying' ? 0 : n.stage === 'heat' ? 1 : 2;
+  const sched = `<div class="night-steps">${steps.map((t, i) => `<span class="${i < at ? 'done' : i === at ? 'now' : ''}">${t}</span>`).join('<b>›</b>')}</div>`;
+  if (n.stage === 'qualifying') {
+    title = `Race Night at ${TRACK_DEF.name}`;
+    html = `<p>Run 2 timed laps to qualify. Qualifying sets up the heat races (${n.entries.length} cars), and the heats set the lineup for the ${n.featureLaps}-lap A-Main.</p><p class="small muted">The track is tacky for qualifying and slicks off as the night goes on.</p>`;
+  } else if (n.stage === 'heat') {
+    const me = n.qualRank(n.entries[0]) + 1;
+    title = `Qualifying: you were P${me}`;
+    html = `<h3>Qualifying</h3><div class="nl">${n.qual.map((q, i) => nightRow(i + 1, q.entry, isFinite(q.time) ? q.time.toFixed(3) : '-')).join('')}</div>`
+      + `<h3>Your heat: Heat ${n.playerHeat + 1} (${ev.laps} laps)</h3><div class="nl">${ev.grid.map((e, i) => nightRow(i + 1, e, `Q${n.qualRank(e) + 1}`)).join('')}</div>`;
+  } else if (n.stage === 'feature') {
+    const myHeat = n.heats[n.playerHeat].result.findIndex((e) => e.isPlayer) + 1;
+    title = `Heat ${n.playerHeat + 1}: you finished P${myHeat}`;
+    html = n.heats.map((h, i) => `<h3>Heat ${i + 1}${i === n.playerHeat ? ' (yours)' : ''}</h3><div class="nl">${h.result.map((e, j) => nightRow(j + 1, e)).join('')}</div>`).join('')
+      + `<h3>A-Main lineup (${ev.laps} laps)</h3><div class="nl">${ev.grid.map((e, i) => nightRow(i + 1, e)).join('')}</div>`;
+    title += ` · you start the A-Main P${ev.grid.findIndex((e) => e.isPlayer) + 1}`;
+  }
+  $('night-title').textContent = title;
+  $('night-body').innerHTML = sched + html;
+  $('night-go').textContent = ev ? `Go: ${ev.title}` : 'Done';
+  show('night');
+}
+
+// a night event just ended: record it and move the night along
+function nightEventDone() {
+  if (!night || !session) return;
+  const ev = session.nightEvent;
+  if (ev.kind === 'qual') {
+    night.recordQualifying(session.bestLap);
+  } else {
+    const byDriver = new Map(night.entries.map((e) => [e.driver, e]));
+    const order = session.standings().map((r) => (r.isPlayer ? night.entries[0] : byDriver.get(r.ref.driver)));
+    if (night.stage === 'heat') night.recordPlayerHeat(order);
+    else { night.recordFeature(order); showResults(); return; }
+  }
+  $('hud').classList.add('hidden');
+  showNight();
+}
+
 function showResults() {
   if (!session || session.mode !== 'race') return;
   state = 'results';
   const st = session.standings();
   const pos = st.findIndex((r) => r.isPlayer) + 1;
   const me = st[pos - 1];
-  $('results-title').textContent = me.dnf ? 'DNF: flipped' : pos === 1 ? 'Victory Lane! You won!' : `You finished P${pos}`;
+  $('results-title').textContent = (night ? 'A-Main: ' : '') + (me.dnf ? 'DNF: flipped' : pos === 1 ? 'Victory Lane! You won!' : `You finished P${pos}`);
+  $('results-again').textContent = night ? 'New Night' : 'Race Again';
   const L = track.L, leaderDist = st[0].dist;
   $('results-list').innerHTML = st.map((r, i) => {
     const down = Math.floor((leaderDist - r.dist) / L + 0.02);
@@ -402,8 +484,9 @@ function updateHud(dt) {
       return `<div class="row ${r.isPlayer ? 'me' : ''}"><span>${i + 1}</span><span class="num" style="background:${r.colors[0]};color:${r.colors[2]}">${r.number}</span><span>${r.isPlayer ? 'YOU' : r.name.split(' ').slice(-1)[0]}</span></div>`;
     }).join('');
   } else {
-    $('hud-pos').innerHTML = 'HOT LAPS';
-    $('hud-lap').textContent = `Laps ${s.playerLaps.length}`;
+    const q = s.mode === 'qual';
+    $('hud-pos').innerHTML = q ? 'QUALIFYING' : 'HOT LAPS';
+    $('hud-lap').textContent = q ? (s.playerStatus === 'finished' ? `Qualified ${s.bestLap.toFixed(3)}` : `Lap ${Math.min(s.playerLaps.length + 1, s.qualLaps)} of ${s.qualLaps}`) : `Laps ${s.playerLaps.length}`;
     $('hud-time').textContent = s.lapStartTime != null ? (s.time - s.lapStartTime).toFixed(2) : 'out lap';
     $('hud-best').textContent = `Last ${fmt(s.lastLap)} · Best ${fmt(s.bestLap)}${TRACK_DEF.recordLap ? ' · Record ' + TRACK_DEF.recordLap.toFixed(3) : ''}`;
     $('hud-flag').className = 'flag green';
@@ -581,4 +664,4 @@ ensureCars([]).then(() => {
   // park it on the front stretch for the menu backdrop
   placeCar(playerMesh, track.x[0], track.z[0], 0, 0, -3);
 });
-window.__lps = { renderer, sound, aiMeshes, track, surface, get session() { return session; }, settings, startSession, setCam };
+window.__lps = { renderer, sound, aiMeshes, track, surface, get session() { return session; }, settings, startSession, setCam, get night() { return night; } };

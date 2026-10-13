@@ -19,27 +19,36 @@ export class Session {
     this.playerStatus = 'running'; // running | finished | dnf
     this.flag = 'green';
     this._pw = { x: 0, z: 0 };
+    // race night: the track is already worn in by earlier events
+    this.surfaceLaps = opts.surfaceLaps || 0;
+    this.qualLaps = opts.qualLaps || 2;
 
     if (mode === 'race') {
-      const n = clamp(fieldSize, 2, drivers.length + 1);
-      this.field = new AIField(track, surface, drivers.slice(0, n - 1), difficulty);
+      // opts.grid: a set starting order ({ driver, isPlayer } / { driver, skill })
+      const grid = opts.grid;
+      const aiEntries = grid ? grid.filter((e) => !e.isPlayer) : null;
+      const n = grid ? grid.length : clamp(fieldSize, 2, drivers.length + 1);
+      const aiDrivers = aiEntries ? aiEntries.map((e) => e.driver) : drivers.slice(0, n - 1);
+      const skills = aiEntries ? new Map(aiEntries.map((e) => [e.driver, e.skill])) : null;
+      this.field = new AIField(track, surface, aiDrivers, difficulty, skills);
       this.phase = 'pace';
       this.flag = 'none';
       this.paceSpeed = 21;
-      this._setupGrid(startPos, n);
+      this._setupGrid(grid ? grid.findIndex((e) => e.isPlayer) : startPos, n);
     } else {
       this.phase = 'running';
       this.car.reset(track.L * 0.55, -2, 18);
       this.profile = new SpeedProfile(track, surface);
       this.message('Out lap: the car drives itself. You take over at the line.', 4);
       this.lapStartTime = null;
-      surface.setLaps(0);
+      surface.setLaps(this.surfaceLaps);
+      if (mode === 'qual') this.message(`Qualifying: ${this.qualLaps} timed laps. The car drives itself until the line.`, 4);
     }
   }
 
   _setupGrid(startPos, n) {
     const t = this.track;
-    let k = startPos === 'front' ? 0 : startPos === 'back' ? n - 1 : startPos === 'middle' ? Math.floor(n / 2) : Math.floor(Math.random() * n);
+    let k = typeof startPos === 'number' ? startPos : startPos === 'front' ? 0 : startPos === 'back' ? n - 1 : startPos === 'middle' ? Math.floor(n / 2) : Math.floor(Math.random() * n);
     this.playerGridSlot = k;
     this.gridLeadS = t.L * 0.5 + 12;
     this.slots = new Map();
@@ -63,7 +72,7 @@ export class Session {
     }
     this.car.speedLimit = this.paceSpeed + 1.5;
     this.paceLeadS = this.gridLeadS;
-    this.surface.setLaps(0);
+    this.surface.setLaps(this.surfaceLaps);
     this.message('Pace lap: the car drives itself. You take over at the green.', 4);
   }
 
@@ -125,7 +134,7 @@ export class Session {
     let inp = this.playerStatus === 'dnf' ? { steer: 0, throttle: 0, brake: 1 } : input;
     // the computer drives the pace lap / out lap; you get the car at the green / the line
     // and takes it back for the cool-down once you've taken the checkered flag
-    this.autoDriving = !car.flipped && (this.mode === 'race' ? this.phase === 'pace' || this.playerStatus === 'finished' : this.lapStartTime == null && !this._handedOver);
+    this.autoDriving = !car.flipped && (this.mode === 'race' ? this.phase === 'pace' || this.playerStatus === 'finished' : (this.lapStartTime == null && !this._handedOver) || this.playerStatus === 'finished');
     if (this.autoDriving) inp = this._autoInput();
     const sub = 2, h = dt / sub;
     for (let i = 0; i < sub; i++) car.step(h, inp);
@@ -162,7 +171,7 @@ export class Session {
 
   _autoInput() {
     const t = this.track, car = this.car;
-    if (this.mode === 'race' && this.playerStatus === 'finished') {
+    if (this.playerStatus === 'finished') {
       // cool-down: ease off and roll around down low
       const v = Math.max(18, car.u - 6);
       return autopilot(car, t, -t.W * 0.3, v);
@@ -190,13 +199,19 @@ export class Session {
         if (pb) this.bestLap = lt;
         this.message(`${lt.toFixed(3)}${pb ? '  BEST' : ''}`, 3, true);
         this.onLap && this.onLap(lt, pb);
+        if (this.mode === 'qual' && this.playerLaps.length >= this.qualLaps && this.playerStatus === 'running') {
+          this.playerStatus = 'finished';
+          this.phase = 'done';
+          this.message(`Qualified: ${this.bestLap.toFixed(3)}`, 4, true);
+          this.onDone && this.onDone();
+        }
       } else {
         this.message('GO! You have the car.', 1.8, true);
         this._handedOver = true;
         this.onHandover && this.onHandover();
       }
-      this.lapStartTime = this.time;
-      this.surface.setLaps(this.playerLaps.length * 1.0);
+      this.lapStartTime = this.playerStatus === 'running' ? this.time : null;
+      this.surface.setLaps(this.surfaceLaps + this.playerLaps.length * 1.0);
     }
     if (Math.floor(car.S / L) < Math.floor(prevS / L)) this.lapStartTime = null; // went backwards
   }
@@ -233,7 +248,7 @@ export class Session {
 
     // ---- surface evolves with the leader's laps ----
     const ll = this.leaderLaps();
-    if (this.phase !== 'pace') this.surface.setLaps(Math.floor(ll * 4) / 4);
+    if (this.phase !== 'pace') this.surface.setLaps(this.surfaceLaps + Math.floor(ll * 4) / 4);
 
     // ---- lap counting / flags ----
     if (this.phase !== 'pace') {
