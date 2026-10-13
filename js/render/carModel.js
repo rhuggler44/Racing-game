@@ -246,6 +246,79 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #57 Logan Seavey: navy blue car over black carbon, silver-white cockpit
+  // panel with speed lines and the Mountain Mechanical Contractors oval, Indy
+  // Powersports / Droplight / Composite Specialties, mint 57 outlined white,
+  // SEAVEY plate, black chassis and wheels
+  seavey57(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const navy = '#1c3168', carbon = '#15171b', silver = '#d9dde2', mint = '#7fe0c8', white = '#f5f6f7', blue = '#2a63c4';
+    x.fillStyle = navy; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // Mountain Mechanical oval
+    const mtn = (cx, cy, rw, rh) => {
+      x.fillStyle = navy; x.beginPath(); x.ellipse(cx, cy, rw, rh, -0.08, 0, Math.PI * 2); x.fill();
+      x.fillStyle = white; x.beginPath(); x.ellipse(cx, cy, rw * 0.9, rh * 0.84, -0.08, 0, Math.PI * 2); x.fill();
+      x.fillStyle = mint; x.beginPath(); x.moveTo(cx - rw * 0.6, cy - rh * 0.05); x.lineTo(cx - rw * 0.3, cy - rh * 0.6); x.lineTo(cx, cy - rh * 0.2); x.lineTo(cx + rw * 0.25, cy - rh * 0.5); x.lineTo(cx + rw * 0.55, cy - rh * 0.05); x.fill();
+      txt('MOUNTAIN MECHANICAL', cx, cy + rh * 0.12, rh * 0.26, navy, { italic: true, maxW: rw * 1.5 });
+      txt('CONTRACTORS, INC.', cx, cy + rh * 0.5, rh * 0.18, navy, { weight: 800, maxW: rw * 1.2 });
+    };
+    // hood sides: navy over black carbon, sponsors
+    const hoodSide = (w, h, rr) => {
+      x.fillStyle = carbon; x.fillRect(0, h * 0.62, w, h * 0.38);
+      x.fillStyle = blue; x.fillRect(0, h * 0.6, w, h * 0.025);
+      const f = (v) => (rr ? w * v : w * (1 - v));
+      txt('INDY', f(0.18), h * 0.3, h * 0.2, white, { stroke: carbon, sw: 0.1, maxW: w * 0.16 });
+      txt('POWERSPORTS', f(0.18), h * 0.45, h * 0.06, white, { weight: 800, maxW: w * 0.16 });
+      txt('DROPLIGHT', f(0.45), h * 0.3, h * 0.09, white, { weight: 800, maxW: w * 0.2 });
+      txt('COMPOSITE SPECIALTIES', f(0.72), h * 0.3, h * 0.07, white, { italic: true, maxW: w * 0.26 });
+      const lows = [['AFD', 0.15], ['DH', 0.35], ['STANTON', 0.55], ['CRW', 0.78]];
+      for (const [t, v] of lows) txt(t, f(v), h * 0.8, h * 0.09, white, { italic: true, maxW: w * 0.16 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { x.fillStyle = carbon; x.fillRect(0, h * 0.55, w, h * 0.45); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = carbon; x.fillRect(0, 0, w, h); });
+    // cockpit sides (x = 0 is the back): silver panel with white speed lines and the oval
+    const cockSide = (w, h) => {
+      x.fillStyle = silver;
+      x.beginPath(); x.moveTo(0, h * 0.14); x.lineTo(w * 0.92, h * 0.24); x.lineTo(w, h * 0.5); x.lineTo(w * 0.85, h * 0.92); x.lineTo(0, h * 0.92); x.fill();
+      x.strokeStyle = white; x.lineWidth = h * 0.012;
+      for (let i = 0; i < 9; i++) { const y = h * (0.2 + i * 0.08); x.beginPath(); x.moveTo(0, y); x.lineTo(w * 0.35, y); x.stroke(); }
+      x.fillStyle = navy; x.fillRect(0, h * 0.92, w, h * 0.08);
+      mtn(w * 0.58, h * 0.52, w * 0.36, h * 0.26);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: navy with speed lines, big mint 57
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = carbon; x.fillRect(0, h * 0.82, w, h * 0.18);
+      x.strokeStyle = silver; x.lineWidth = h * 0.012;
+      for (let i = 0; i < 6; i++) { const y = h * (0.2 + i * 0.09); x.beginPath(); x.moveTo(rr ? 0 : w * 0.7, y); x.lineTo(rr ? w * 0.3 : w, y); x.stroke(); }
+      txt('57', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.42, mint, { stroke: white, sw: 0.12, maxW: w * 0.32 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { txt('DROPLIGHT', w * 0.5, h * 0.3, h * 0.12, white, { weight: 800, maxW: w * 0.6 }); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = silver; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('SEAVEY', 0, 0, w * 0.6, carbon, { italic: true, stroke: white, sw: 0.1, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: silver, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: navy, coverLeft: false,
+      number: mint, numberOutline: navy, numberShadow: white, paintedTailNumbers: true,
+    };
+  },
+
   // #92 Chase Stockon: white car, teal chassis and cage, purple band edged in
   // pink with teal stripes sweeping down the sides, Lucas Oil Center / Engler
   // on the white cockpit sides, big teal 92 outlined purple on the tail
