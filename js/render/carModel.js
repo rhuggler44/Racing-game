@@ -256,6 +256,82 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #77 Todd Hobson: black carbon car with a big STIHL-orange panel and white
+  // STIHL, gray slashes low, MBL Transport, Wingo; black wheels with white MB
+  // logo mud covers on the left side
+  hobson77(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const black = '#121315', carbon = '#1d1f23', orange = '#f37a1f', gray = '#5b6066', white = '#f6f6f4';
+    x.fillStyle = carbon; x.fillRect(0, 0, S, S);
+    // faint carbon weave
+    x.strokeStyle = 'rgba(255,255,255,0.035)'; x.lineWidth = 2;
+    for (let i = -S; i < S; i += 10) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + S, S); x.stroke(); }
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // hood sides: the orange STIHL panel with an angled front edge, gray slashes low
+    const hoodSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.fillStyle = orange;
+      x.beginPath(); x.moveTo(w * 0.22, h * 0.08); x.lineTo(w, h * 0.08); x.lineTo(w, h * 0.68); x.lineTo(w * 0.32, h * 0.68); x.lineTo(w * 0.12, h * 0.4); x.fill();
+      x.fillStyle = gray;
+      x.beginPath(); x.moveTo(w * 0.3, h * 0.98); x.lineTo(w * 0.55, h * 0.74); x.lineTo(w * 0.6, h * 0.74); x.lineTo(w * 0.36, h * 0.98); x.fill();
+      x.beginPath(); x.moveTo(w * 0.4, h * 0.98); x.lineTo(w * 0.65, h * 0.74); x.lineTo(w * 0.68, h * 0.74); x.lineTo(w * 0.44, h * 0.98); x.fill();
+      x.restore();
+      txt('STIHL', rr ? w * 0.64 : w * 0.36, h * 0.38, h * 0.56, white, { italic: true, maxW: w * 0.66 });
+      txt('WINGO', rr ? w * 0.78 : w * 0.22, h * 0.84, h * 0.09, white, { italic: true, maxW: w * 0.16 });
+      txt('VANDER', rr ? w * 0.25 : w * 0.75, h * 0.86, h * 0.07, white, { italic: true, maxW: w * 0.14 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { x.fillStyle = orange; x.fillRect(0, 0, w, h * 0.08); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides (x = 0 is the back): sponsor stack on the tall panel,
+    // the orange panel carries on up front
+    const cockSide = (w, h) => {
+      x.fillStyle = orange; x.fillRect(w * 0.4, h * 0.5, w * 0.6, h * 0.38);
+      x.fillStyle = black; x.fillRect(w * 0.4, h * 0.88, w * 0.6, h * 0.12);
+      const list = [['WBR', 0.1], ['MUSTANG', 0.19], ['SUPPLY', 0.28], ['JST', 0.37], ['CSI', 0.46]];
+      for (const [t, fy] of list) txt(t, w * 0.15, h * fy, h * 0.06, white, { italic: true, maxW: w * 0.26 });
+      txt('HOBSON', w * 0.62, h * 0.43, h * 0.07, white, { italic: true, maxW: w * 0.4 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: orange MBL Transport panel up front, white 77 outlined orange
+    const tailSide = (w, h, rr) => {
+      const fx = rr ? 0 : w * 0.62;
+      x.fillStyle = orange; x.fillRect(fx, h * 0.2, w * 0.38, h * 0.18);
+      txt('MBL TRANSPORT', fx + w * 0.19, h * 0.29, h * 0.09, white, { italic: true, maxW: w * 0.34 });
+      txt('77', rr ? w * 0.6 : w * 0.48, h * 0.55, h * 0.42, white, { italic: true, stroke: orange, sw: 0.12, maxW: w * 0.32 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = orange; x.fillRect(w * 0.45, 0, w * 0.1, h); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = orange; x.fillRect(w * 0.55, 0, w * 0.45, h * 0.08); x.fillRect(w * 0.55, h * 0.92, w * 0.45, h * 0.08); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = orange; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('HOBSON', 0, 0, w * 0.6, white, { italic: true, maxW: h * 0.85 });
+      x.restore();
+    });
+    // MB logo mud covers (left-side wheels)
+    const cover = (r) => P.flat(r, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      const cx = w / 2, cy = h / 2, s = Math.min(w, h) * 0.32;
+      x.fillStyle = '#c9a646';
+      for (let i = 0; i < 18; i++) { const a = (i / 18) * Math.PI * 2; x.beginPath(); x.arc(cx + Math.cos(a) * s * 1.35, cy + Math.sin(a) * s * 1.35, s * 0.05, 0, 7); x.fill(); }
+      x.save(); x.translate(cx, cy); x.rotate(Math.PI); txt('MB', 0, 0, s * 0.95, white, { maxW: s * 1.8 }); x.restore(); // the cover disc maps upside down
+    });
+    cover(R.wheelRear); cover(R.wheelFront);
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: orange, coverLeft: true,
+      number: white, numberOutline: orange, numberShadow: black, paintedTailNumbers: true,
+    };
+  },
+
   // #41 Ricky Lewis: white over black with red and black slashes, Morris Farms
   // (with the tractor) on the hood, Mesilla Valley Transportation on the
   // cockpit, Freedom Roofing atop the tall panel, white 41 outlined red on the

@@ -30,6 +30,7 @@ export const DRIVERS = [
   { name: 'Shane Cottle',    number: '34',  colors: ['#f4f3f0', '#8c1d3c', '#8c1d3c'], rating: 1.4, livery: 'cottle34' },
   { name: 'Saban Bibent',    number: '98',  colors: ['#f3f3f1', '#2b3fd1', '#ff5a14'], rating: 0.95, livery: 'bibent98' },
   { name: 'Ricky Lewis',     number: '41',  colors: ['#f4f4f2', '#131313', '#e0242c'], rating: 1.05, livery: 'lewis41' },
+  { name: 'Todd Hobson',     number: '77',  colors: ['#1d1f23', '#f37a1f', '#f6f6f4'], rating: 1.1, livery: 'hobson77' },
   // placeholder field
   { name: 'Jace Whitfield',  number: '11',  colors: ['#0033a0', '#ffd100', '#ffffff'], rating: 1.2 },
   { name: 'Mason Kreider',   number: '7K',  colors: ['#f5f5f5', '#111111', '#111111'], rating: 1.0 },
