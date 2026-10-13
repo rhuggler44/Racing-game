@@ -302,6 +302,7 @@ export class TrackScene {
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (let i = 0; i < t.N; i++) { minX = Math.min(minX, t.x[i]); maxX = Math.max(maxX, t.x[i]); minZ = Math.min(minZ, t.z[i]); maxZ = Math.max(maxZ, t.z[i]); }
     const pr = {};
+    const cx0 = (minX + maxX) / 2, cz0 = (minZ + maxZ) / 2;
     for (let z = minZ + 8; z < maxZ - 8; z += 13) {
       for (let x0 = minX + 10; x0 < maxX - 10; x0 += 21) {
         const x = x0 + (r() - 0.5) * 3, zz = z + (r() - 0.5) * 1.5;
@@ -309,8 +310,8 @@ export class TrackScene {
         let ok = true;
         for (const ex of [-12, 0, 12]) { t.project(x + ex, zz, -1, pr); if (pr.d > keep) ok = false; }
         if (!ok) continue;
-        // leave a lane down the middle and some gaps
-        if (Math.abs(zz) < 5 || r() < 0.12) continue;
+        // leave a lane down the middle, room for the infield building, and some gaps
+        if (Math.abs(zz - cz0) < 5 || (Math.abs(x - cx0) < 26 && Math.abs(zz - cz0) < 22) || r() < 0.12) continue;
         spots.push([x, zz, r() < 0.5 ? 0 : Math.PI]);
       }
     }
@@ -338,6 +339,12 @@ export class TrackScene {
       awn.setColorAt(i, c.set(['#d0102a', '#0d47a1', '#e8e8e8', '#1c1c1c', '#f9a825'][Math.floor(r() * 5)]));
     });
     this.group.add(trailers, cabs, glass, awn);
+    // the building in the middle of the infield
+    const bld = new THREE.Mesh(new THREE.BoxGeometry(26, 6, 22), new THREE.MeshLambertMaterial({ color: '#b9b4aa' }));
+    bld.position.set(cx0, y + 3, cz0);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(27, 0.6, 23), new THREE.MeshLambertMaterial({ color: '#7d8186' }));
+    roof.position.set(cx0, y + 6.3, cz0);
+    this.group.add(bld, roof);
   }
 
   // ---------------- terrain outside the track ----------------

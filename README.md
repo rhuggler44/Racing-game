@@ -27,7 +27,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 ## Tracks
 Pick the track on the main menu.
 - **Lincoln Park Speedway** (Putnamville, IN): 5/16-mile clay oval, open turns, wall on the front stretch only (details below).
-- **Eldora Speedway** (Rossburg, OH): the high-banked 1/2-mile, laid out from an in-car video. A concrete wall and catch fence all the way around, billboards along the fence in the turns, a backstretch with a gentle bend and a row of big billboards, an inside wall with yellow pads and its own fence, a concrete infield packed with haulers, gray-brown clay, the big front-stretch grandstand, grandstands and the tower in turn 3, and hillside seating through turn 4. Banking and dimensions are approximate.
+- **Eldora Speedway** (Rossburg, OH): the high-banked 1/2-mile, laid out from an in-car video. A concrete wall and catch fence all the way around, billboards along the fence in the turns, a backstretch with a gentle bend and a row of big billboards, an inside wall with yellow pads and its own fence, a concrete infield packed with haulers around the infield building, gray-brown clay, the big front-stretch grandstand, grandstands and the tower in turn 3, and hillside seating through turn 4. Banking and dimensions are approximate.
 
 Best hot laps are saved separately for each track.
 

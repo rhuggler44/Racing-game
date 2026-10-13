@@ -34,8 +34,8 @@ export const ELDORA = {
   location: 'Rossburg, Ohio',
   lengthLabel: '1/2 mile',
   length: 804.67,
-  straight: 108,        // short straights, big sweeping turns (~80 m radius)
-  backBend: 0.22,       // the backstretch has a gentle bend in it (satellite view)
+  straight: 90,         // short straights, big sweeping turns (~88 m radius), from the satellite view
+  backBend: 0.26,       // the backstretch bows out a little instead of running dead straight
   ramp: 45,
   width: 24,
   bankTurn: 20 * DEG,
@@ -43,7 +43,7 @@ export const ELDORA = {
   recordLap: null,
   layout: 'walled',     // wall right at the edge all the way around
   inner: { apron: 2.4, edge: 2.9, wall: true },
-  grip: 0.85,  // the big, fast banks are tuned down to sane lap times
+  grip: 0.8,   // the big, fast banks are tuned down to sane lap times
   aiPace: 1.1,   // the AI's speed profile undersells these banks; this evens it up
   clay: [[104, 86, 70], [176, 158, 134], [88, 72, 58], [150, 134, 112]],
 };
