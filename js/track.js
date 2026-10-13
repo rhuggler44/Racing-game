@@ -35,6 +35,7 @@ export const ELDORA = {
   lengthLabel: '1/2 mile',
   length: 804.67,
   straight: 108,        // short straights, big sweeping turns (~80 m radius)
+  backBend: 0.22,       // the backstretch has a gentle bend in it (satellite view)
   ramp: 45,
   width: 24,
   bankTurn: 20 * DEG,
@@ -52,7 +53,10 @@ export const TRACKS = { [LINCOLN_PARK.id]: LINCOLN_PARK, [ELDORA.id]: ELDORA };
 export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   const L = def.length, S = def.straight, T = def.ramp;
   const A = (L - 2 * S) / 2 - 2 * T; // constant-radius arc per turn
-  const kMax = Math.PI / (A + T);
+  // def.backBend: the backstretch isn't dead straight; it bends gently left by
+  // this many radians, and each turn gives up half of that
+  const bend = def.backBend || 0;
+  const kMax = (Math.PI - bend / 2) / (A + T);
   const segs = [
     [S / 2, 's'], [T, 'in'], [A, 'arc'], [T, 'out'],
     [S, 's'], [T, 'in'], [A, 'arc'], [T, 'out'], [S / 2, 's'],
@@ -65,10 +69,11 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   }
   function curv(s) {
     let s0 = 0;
-    for (const [len, kind] of segs) {
+    for (let si = 0; si < segs.length; si++) {
+      const [len, kind] = segs[si];
       if (s < s0 + len) {
         const t = (s - s0) / len;
-        if (kind === 's') return 0;
+        if (kind === 's') return si === 4 && bend ? (bend / len) * 2 * Math.sin(Math.PI * t) ** 2 : 0;
         if (kind === 'arc') return kMax;
         if (kind === 'in') return kMax * t;
         return kMax * (1 - t);

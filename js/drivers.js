@@ -1,7 +1,7 @@
 // Placeholder field. Swap in real names/numbers/colors any time.
 // colors: [body, accent, number]
 export const PLAYER = {
-  name: 'You',
+  name: 'Ryan Huggler',
   number: '44',
   sponsor: 'RACO Marketing',
   colors: ['#0b0b0e', '#f2cf7e', '#ffffff'],
@@ -10,7 +10,7 @@ export const PLAYER = {
 };
 
 // When you pick another driver to be, the #44 RACO car races as an AI car
-export const HUGGLER44 = { name: 'Ryan Huggler', number: '44', sponsor: 'RACO Marketing', colors: PLAYER.colors, raco: true };
+export const HUGGLER44 = { name: PLAYER.name, number: '44', sponsor: 'RACO Marketing', colors: PLAYER.colors, raco: true };
 
 export const DRIVERS = [
   // real cars (custom paint in js/render/carModel.js -> CUSTOM_LIVERIES)

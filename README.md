@@ -27,7 +27,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 ## Tracks
 Pick the track on the main menu.
 - **Lincoln Park Speedway** (Putnamville, IN): 5/16-mile clay oval, open turns, wall on the front stretch only (details below).
-- **Eldora Speedway** (Rossburg, OH): the high-banked 1/2-mile, laid out from an in-car video. A concrete wall and catch fence all the way around, billboards along the fence in the turns, an inside wall with yellow pads, a concrete infield packed with haulers, gray-brown clay, big grandstands down both straights and the tower out of turn 4. Banking and dimensions are approximate.
+- **Eldora Speedway** (Rossburg, OH): the high-banked 1/2-mile, laid out from an in-car video. A concrete wall and catch fence all the way around, billboards along the fence in the turns, a backstretch with a gentle bend and a row of big billboards, an inside wall with yellow pads and its own fence, a concrete infield packed with haulers, gray-brown clay, the big front-stretch grandstand, grandstands and the tower in turn 3, and hillside seating through turn 4. Banking and dimensions are approximate.
 
 Best hot laps are saved separately for each track.
 
@@ -40,7 +40,7 @@ Best hot laps are saved separately for each track.
   - *After Heavy Rain:* tacky and fast early, but the cushion gets tall and choppy and can hook you.
   - *Dry Slick:* throttle control wins.
 - **Lincoln Park layout, modeled on photos of the track:** a wall on the front stretch only, no wall in turns 1-2 (jump the cushion and you go over the bank), a backstretch wall set back off the track, flat runoff out to the pits in turns 3-4, and a clay berm ringing the infield. Night or day.
-- **Driver select** (main menu): drive any of the real cars. When you're not in the #44, it races against you as Ryan Huggler's car.
+- **Driver select** (main menu): drive any of the real cars. When you're not in the #44, Ryan Huggler's #44 races against you.
 - Your **#44 RACO Marketing** car. The iRacing paint file (`assets/paint/raco-44-iracing-scheme.jpg`) is mapped panel by panel onto the car (see `PAINT_REGIONS` in `js/render/carModel.js`), with a gold chassis and cage, painted left-side mud covers and the HUGGLER name plate.
 - Real Indiana drivers' cars (painted from photos) plus a few placeholder drivers, in `js/drivers.js`. Liveries are in `CUSTOM_LIVERIES` in `js/render/carModel.js`.
 

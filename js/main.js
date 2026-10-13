@@ -219,7 +219,7 @@ function showDriverSelect() {
   const all = [PLAYER, ...DRIVERS.filter((d) => d.livery)];
   $('driver-grid').innerHTML = all.map((d) => {
     const on = (d === PLAYER ? '44' : d.number) === settings.driver;
-    return `<button class="drv ${on ? 'on' : ''}" data-pick="${d.number}"><span class="num" style="background:${d.colors[0]};color:${d.colors[2]};border:1px solid ${d.colors[1]}">${d.number}</span><span>${d === PLAYER ? 'You (RACO Marketing)' : d.name}</span></button>`;
+    return `<button class="drv ${on ? 'on' : ''}" data-pick="${d.number}"><span class="num" style="background:${d.colors[0]};color:${d.colors[2]};border:1px solid ${d.colors[1]}">${d.number}</span><span>${d.name}</span></button>`;
   }).join('');
   show('driver-select');
 }
@@ -233,7 +233,7 @@ document.addEventListener('click', (e) => {
 
 function refreshMenu() {
   const { me } = chosen();
-  $('menu-driver').innerHTML = `Driver: <span class="num" style="background:${me.colors[0]};color:${me.colors[2]};border:1px solid ${me.colors[1]}">${me.number}</span> ${me === PLAYER ? 'You' : me.name.split(' ').slice(-1)[0]} <b>›</b>`;
+  $('menu-driver').innerHTML = `Driver: <span class="num" style="background:${me.colors[0]};color:${me.colors[2]};border:1px solid ${me.colors[1]}">${me.number}</span> ${me.name.split(' ').slice(-1)[0]} <b>›</b>`;
   const b = store.get(bestKey(settings.hotPrep), null);
   const rec = TRACK_DEF.recordLap ? `Track record: ${TRACK_DEF.recordLap.toFixed(3)}s (${TRACK_DEF.recordBy})` : '';
   $('menu-best').textContent = b ? `Your best hot lap (${PREPS[settings.hotPrep].label}): ${b.toFixed(3)}s${recordText ? ' · ' + recordText : ''}` : rec;
@@ -458,7 +458,8 @@ const miniPath = (() => {
   for (let i = 0; i < track.N; i++) { minX = Math.min(minX, track.x[i]); maxX = Math.max(maxX, track.x[i]); minZ = Math.min(minZ, track.z[i]); maxZ = Math.max(maxZ, track.z[i]); }
   const sc = Math.min(130 / (maxX - minX), 80 / (maxZ - minZ));
   const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-  return { map: (x, z) => [75 + (x - cx) * sc, 50 - (z - cz) * sc] };
+  // seen from above: front stretch along the bottom, cars run counterclockwise (left turns)
+  return { map: (x, z) => [75 + (x - cx) * sc, 50 + (z - cz) * sc] };
 })();
 function drawMinimap() {
   mini.clearRect(0, 0, 150, 100);
@@ -518,7 +519,7 @@ function updateHud(dt) {
     if (me >= 5) rows.push(me);
     $('tower').innerHTML = rows.map((i) => {
       const r = st[i];
-      return `<div class="row ${r.isPlayer ? 'me' : ''}"><span>${i + 1}</span><span class="num" style="background:${r.colors[0]};color:${r.colors[2]}">${r.number}</span><span>${r.isPlayer ? 'YOU' : r.name.split(' ').slice(-1)[0]}</span></div>`;
+      return `<div class="row ${r.isPlayer ? 'me' : ''}"><span>${i + 1}</span><span class="num" style="background:${r.colors[0]};color:${r.colors[2]}">${r.number}</span><span>${r.name.split(' ').slice(-1)[0]}</span></div>`;
     }).join('');
   } else {
     const q = s.mode === 'qual';

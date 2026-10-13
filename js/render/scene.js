@@ -253,6 +253,32 @@ export class TrackScene {
     wg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     wg.setIndex(idx); wg.computeVertexNormals();
     this.group.add(new THREE.Mesh(wg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    // catch fence on top of the inside wall
+    const fH = 2.6, fpos = [], fuv = [], fidx = [];
+    for (let i = 0; i <= n; i++) {
+      const s = (t.L * i) / n;
+      t.pos(s, -W / 2 - edge - 0.17, q);
+      const y = t.height(s, -W / 2 - edge) + 0.85;
+      fpos.push(q.x, y, q.z, q.x, y + fH, q.z);
+      const u = s / 0.6;
+      fuv.push(u, 0, u, fH / 0.6);
+      if (i < n) { const a = i * 2; fidx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    }
+    const fg = new THREE.BufferGeometry();
+    fg.setAttribute('position', new THREE.Float32BufferAttribute(fpos, 3));
+    fg.setAttribute('uv', new THREE.Float32BufferAttribute(fuv, 2));
+    fg.setIndex(fidx);
+    this.group.add(new THREE.Mesh(fg, this._fenceMat()));
+    const np = Math.floor(t.L / 5);
+    const posts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.05, fH + 0.1, 5), new THREE.MeshLambertMaterial({ color: '#8d8d8d' }), np);
+    const m4 = new THREE.Matrix4();
+    for (let i = 0; i < np; i++) {
+      const s = (t.L * i) / np;
+      t.pos(s, -W / 2 - edge - 0.17, q);
+      m4.makeTranslation(q.x, t.height(s, -W / 2 - edge) + 0.85 + fH / 2, q.z);
+      posts.setMatrixAt(i, m4);
+    }
+    this.group.add(posts);
   }
 
   _concreteTex() {
@@ -466,6 +492,9 @@ export class TrackScene {
         const zs = this.track.turnZones;
         this._billboards(zs[a].s0 + 6, zs[b].s1 - 6, 0.3, 3.0, 1.5);
       }
+      // no grandstands down the backstretch: a row of big billboards behind the wall
+      const zs = this.track.turnZones;
+      this._billboards(zs[4].s0 - 10, zs[4].s1 + 10, 5, 2.5, 4.2);
       return;
     }
     this._wall(L - 52, L + 52, 0.3, 1.0, 3.2, true); // front stretch, right at the edge
@@ -552,17 +581,62 @@ export class TrackScene {
     glass.position.set(0, front.y0 + front.H + 2.7, front.back - 7.02);
     glass.rotation.y = Math.PI;
     front.g.add(glass);
-    this._grandstand(t.L / 2, S * 0.85, 24, 2.2, { rise: 0.5, depth: 0.82, seat: '#2f4f8f' });
-    // the tower building outside turn 4
+    // turn 3: grandstand sections following the curve, the tower behind them
     const zs = t.turnZones;
-    const s4 = zs[7].s0 + 10, p = t.pos(s4, t.W / 2 + 22, {});
+    const t3a = zs[5].s0 + 4, t3b = (zs[6].s0 + zs[6].s1) / 2;
+    let back = 0;
+    for (let sm = t3a + 11; sm < t3b; sm += 22) back = this._grandstand(sm, 22, 22, 2.2, { rise: 0.5, depth: 0.82, seat: '#2f4f8f' }).back;
+    const s3 = zs[5].s1, p = t.pos(s3, t.W / 2 + back + 8, {});
     const tower = new THREE.Group();
-    const tb = new THREE.Mesh(new THREE.BoxGeometry(12, 22, 12), new THREE.MeshLambertMaterial({ color: '#d9d5cc' }));
-    tb.position.y = 11; tower.add(tb);
+    const tb = new THREE.Mesh(new THREE.BoxGeometry(12, 24, 12), new THREE.MeshLambertMaterial({ color: '#d9d5cc' }));
+    tb.position.y = 12; tower.add(tb);
     const tg = new THREE.Mesh(new THREE.BoxGeometry(12.2, 3, 12.2), new THREE.MeshLambertMaterial({ color: '#2c7a4b' }));
-    tg.position.y = 19; tower.add(tg);
-    tower.position.set(p.x, t.outsideY(s4, 22) - 1, p.z);
+    tg.position.y = 21; tower.add(tg);
+    tower.position.set(p.x, t.outsideY(s3, back + 8) - 1, p.z);
     this.group.add(tower);
+    // turn 4: hillside seating, people on the grass bank, running on toward the
+    // front-stretch grandstand
+    this._hillside(t3b, zs[8].s0 + (zs[8].s1 - zs[8].s0) * 0.15);
+  }
+
+  // a grass bank rising away from the wall with fans sitting on it
+  _hillside(s0, s1) {
+    const t = this.track, W = t.W;
+    const es = [0.6, 3, 7, 12, 18, 25, 33, 42];
+    const rise = 0.38;
+    const yOf = (s, e) => t.height(s, W / 2 + 0.3) + 1.3 + Math.max(0, e - 0.6) * rise;
+    const n = Math.max(4, Math.round(((s1 - s0) / t.L) * this.NS));
+    const pos = [], idx = [], p = {};
+    for (let i = 0; i <= n; i++) {
+      const s = s0 + ((s1 - s0) * i) / n;
+      for (const e of es) { t.pos(s, W / 2 + e, p); pos.push(p.x, yOf(s, e), p.z); }
+      if (i < n) for (let j = 0; j < es.length - 1; j++) { const a = i * es.length + j, b = a + es.length; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    this.group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: '#4a7a32', side: THREE.DoubleSide })));
+    // rows of fans sitting on the bank (lawn chairs and blankets)
+    const crowd = this._crowdTex(30);
+    crowd.repeat.set(1, 1);
+    const mat = new THREE.MeshLambertMaterial({ map: crowd, transparent: true, alphaTest: 0.2, side: THREE.DoubleSide });
+    for (const e of [5, 9, 14, 19, 24, 30]) {
+      const cpos = [], cuv = [], cidx = [];
+      for (let i = 0; i <= n; i++) {
+        const s = s0 + ((s1 - s0) * i) / n;
+        t.pos(s, W / 2 + e, p);
+        const y = yOf(s, e);
+        cpos.push(p.x, y - 0.05, p.z, p.x, y + 0.7, p.z);
+        const u = (s - s0) / 12 + e * 0.37;
+        cuv.push(u, 0, u, 1);
+        if (i < n) { const a = i * 2; cidx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+      }
+      const cg = new THREE.BufferGeometry();
+      cg.setAttribute('position', new THREE.Float32BufferAttribute(cpos, 3));
+      cg.setAttribute('uv', new THREE.Float32BufferAttribute(cuv, 2));
+      cg.setIndex(cidx);
+      this.group.add(new THREE.Mesh(cg, mat));
+    }
   }
 
   _buildStands() {
