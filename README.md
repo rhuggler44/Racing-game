@@ -19,6 +19,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 - **Gas (right thumb) and brake (left thumb) are sliders:** thumb at the bottom of the bar = 0%, top = 100%, and the bar fills to show how much you're giving it. Slide up and down to feather, lift off to let go. Settings → Pedals → Buttons switches to full on/off.
 - **Throttle assist** (part of Driving aids): eases the gas a little when you're spinning the tires so much you'd push up the track, or getting too sideways.
 - Hold the brake while stopped to back up.
+- **Contact:** cars have real weight. Rubbing and bump-drafting just knock both cars around, but a hard shot to someone's back bumper (or a hard side hit) spins them, or you. Lapped cars are solid too, so you have to get around them. The AI cars hold their line and only give you a little room.
 - **Walls:** brush the wall and you bounce off and keep going; a big hit costs a lot of speed (and a hard enough one on the concrete flips you).
 - **CAM:** switch between the chase cam and the in-cockpit view.
 - **Sound plays** (Settings): *Always* plays the game sound even with the iPhone's silent switch on, but pauses your music. *With my music* mixes with Spotify / Apple Music, but the silent switch mutes the game. Sound **Off** never touches your music.
@@ -54,7 +55,7 @@ Best hot laps are saved separately for each track.
 | `js/night.js` | Race Night: qualifying, heats, A-Main lineup |
 | `js/render/` | three.js track scene, car model/livery, dust and roost |
 | `js/input.js`, `js/audio.js` | Tilt/touch controls, synthesized 410 engine sound |
-| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs [eldora]`, `node tools/night-test.mjs [eldora]`, `node tools/rejoin-test.mjs` for getting back on the track) |
+| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs [eldora]`, `node tools/night-test.mjs [eldora]`, `node tools/contact-test.mjs`, `node tools/rejoin-test.mjs` for getting back on the track) |
 
 ## Hosting with GitHub Pages
 In the repo, go to **Settings → Pages**. Under *Build and deployment*, set *Source* to **Deploy from a branch**,
