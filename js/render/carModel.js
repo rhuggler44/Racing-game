@@ -246,6 +246,87 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #39 Briggs Danner: black up top, sky blue down low split by yellow
+  // pinstripes, yellow KEYSTONE CAP on the hood sides, yellow Apache Transport
+  // panel on the tail top, sponsors on black tail sides, yellow 39 on blue
+  danner39(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const black = '#121212', sky = '#2f9be8', blue = '#1b67d4', yellow = '#ffe11a', white = '#ffffff';
+    x.fillStyle = black; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // sky blue lower body rising toward the front, with yellow and blue pinstripes
+    const lower = (w, h, rr, yRear = 0.62, yFront = 0.45) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); } // rear on the right
+      x.fillStyle = sky; x.beginPath(); x.moveTo(0, h * yFront); x.lineTo(w, h * yRear); x.lineTo(w, h); x.lineTo(0, h); x.fill();
+      x.strokeStyle = yellow; x.lineWidth = h * 0.025; x.beginPath(); x.moveTo(0, h * (yFront - 0.05)); x.lineTo(w, h * (yRear - 0.05)); x.stroke();
+      x.strokeStyle = blue; x.lineWidth = h * 0.02; x.beginPath(); x.moveTo(0, h * (yFront - 0.1)); x.lineTo(w, h * (yRear - 0.1)); x.stroke();
+      x.restore();
+    };
+    const hoodSide = (w, h, rr) => {
+      lower(w, h, rr, 0.78, 0.6);
+      txt('KEYSTONE CAP', w * 0.5, h * 0.3, h * 0.28, yellow, { stroke: black, sw: 0.1, maxW: w * 0.82 });
+      txt('Your Handy Cap Company', w * 0.5, h * 0.55, h * 0.13, yellow, { italic: true, weight: 800, font: 'Georgia, serif', maxW: w * 0.7 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h, rr) => lower(w, h, rr, 0.5, 0.35);
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = sky; x.fillRect(0, 0, w, h); });
+    const cockSide = (w, h) => {
+      x.fillStyle = sky; x.fillRect(0, h * 0.62, w, h * 0.38);
+      x.fillStyle = yellow; x.fillRect(0, h * 0.58, w, h * 0.025);
+      txt('BRIGGS DANNER', w * 0.5, h * 0.2, h * 0.07, sky, { italic: true, weight: 800, maxW: w * 0.8 });
+      txt('NOS', w * 0.3, h * 0.74, h * 0.08, black); txt('HOOSIER', w * 0.7, h * 0.74, h * 0.07, black, { italic: true });
+      txt('ALLSTAR', w * 0.5, h * 0.88, h * 0.07, black, { weight: 800 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: black with the sponsor stack, blue lower rear with the yellow 39
+    const tailSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.fillStyle = sky; x.beginPath(); x.moveTo(w * 0.35, h); x.quadraticCurveTo(w * 0.6, h * 0.62, w, h * 0.5); x.lineTo(w, h); x.fill();
+      x.strokeStyle = yellow; x.lineWidth = h * 0.02; x.beginPath(); x.moveTo(0, h * 0.42); x.lineTo(w, h * 0.32); x.stroke();
+      x.fillStyle = yellow; x.fillRect(0, 0, w, h * 0.08);
+      x.restore();
+      const cx = rr ? w * 0.3 : w * 0.7;
+      txt('MOOSE', cx, h * 0.16, h * 0.08, white, { maxW: w * 0.36 });
+      txt('PRODUCTIONS', cx, h * 0.23, h * 0.04, white, { weight: 800, maxW: w * 0.36 });
+      txt('Boulevard', cx, h * 0.36, h * 0.09, yellow, { italic: true, maxW: w * 0.4 });
+      txt('TRUCK REPAIR', cx, h * 0.44, h * 0.045, yellow, { weight: 800, maxW: w * 0.4 });
+      txt('E. SCHNEIDER', cx, h * 0.56, h * 0.065, white, { stroke: '#5a3fa0', sw: 0.12, maxW: w * 0.42 });
+      txt('POWER   VP', cx, h * 0.68, h * 0.06, white, { weight: 800, maxW: w * 0.4 });
+      txt('39', rr ? w * 0.6 : w * 0.5, h * 0.44, h * 0.36, yellow, { italic: true, stroke: black, sw: 0.16, maxW: w * 0.3 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    // tail top: the yellow Apache Transport panel
+    P.flat(R.tailTop, true, (w, h) => {
+      x.fillStyle = yellow; x.fillRect(0, h * 0.45, w, h * 0.55);
+      x.save(); x.translate(w * 0.5, h * 0.72); x.rotate(-Math.PI / 2);
+      txt('APACHE', 0, -w * 0.1, w * 0.16, black, { maxW: h * 0.5 });
+      txt('TRANSPORT', 0, w * 0.1, w * 0.12, black, { maxW: h * 0.5 });
+      x.restore();
+    });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = sky; x.fillRect(0, h * 0.4, w, h * 0.6); x.fillStyle = yellow; x.fillRect(0, h * 0.36, w, h * 0.04); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = yellow; x.fillRect(0, h * 0.06, w, h * 0.02); x.fillRect(0, h * 0.92, w, h * 0.02); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = yellow; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('DANNER', 0, 0, w * 0.6, black, { italic: true, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 400; i++) { x.fillStyle = `rgba(200,170,90,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: yellow, coverLeft: false,
+      number: yellow, numberOutline: black, numberShadow: sky, paintedTailNumbers: true,
+    };
+  },
+
   // #5G Gunnar Setser: black and white. White diagonal panel on the hood sides
   // with SETSER Fabricating, ATC on black, black tail front with sponsor stack and
   // "In Memory of Trevor Perry", white tail back with a big black 5G, raw-steel cage

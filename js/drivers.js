@@ -16,6 +16,7 @@ export const DRIVERS = [
   { name: 'Justin Grant',    number: '4',   colors: ['#16181c', '#1f6fe0', '#ffffff'], rating: 1.55, livery: 'grant4' },
   { name: 'Brady Bacon',     number: '69',  colors: ['#ffffff', '#e0242f', '#1d3f9e'], rating: 1.7, livery: 'bacon69' }, // Lincoln Park track record holder
   { name: 'Gunnar Setser',   number: '5G',  colors: ['#ffffff', '#121212', '#121212'], rating: 1.25, livery: 'setser5g' },
+  { name: 'Briggs Danner',   number: '39',  colors: ['#121212', '#2f9be8', '#ffe11a'], rating: 1.35, livery: 'danner39' },
   // placeholder field
   { name: 'Jace Whitfield',  number: '11',  colors: ['#0033a0', '#ffd100', '#ffffff'], rating: 1.2 },
   { name: 'Mason Kreider',   number: '7K',  colors: ['#f5f5f5', '#111111', '#111111'], rating: 1.0 },
