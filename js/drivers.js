@@ -19,6 +19,7 @@ export const DRIVERS = [
   { name: 'Briggs Danner',   number: '39',  colors: ['#121212', '#2f9be8', '#ffe11a'], rating: 1.35, livery: 'danner39' },
   { name: 'Jadon Rogers',    number: '14',  colors: ['#f5f5f2', '#111111', '#d42a2a'], rating: 1.3, livery: 'rogers14' },
   { name: 'Cale Coons',      number: '63',  colors: ['#121214', '#d0202e', '#d9dbde'], rating: 1.2, livery: 'coons63' },
+  { name: 'Mitchel Moles',   number: '19AZ', colors: ['#f6f7f8', '#33b6ea', '#111111'], rating: 1.4, livery: 'moles19az' },
   // placeholder field
   { name: 'Jace Whitfield',  number: '11',  colors: ['#0033a0', '#ffd100', '#ffffff'], rating: 1.2 },
   { name: 'Mason Kreider',   number: '7K',  colors: ['#f5f5f5', '#111111', '#111111'], rating: 1.0 },

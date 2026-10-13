@@ -246,6 +246,95 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #19AZ Mitchel Moles: white car, light-blue top edges and nose with black
+  // arcs, big winged RDI Development logo, AME Electrical, MOLES plate,
+  // sponsor stack on the tail, black wheels
+  moles19az(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f6f7f8', sky = '#33b6ea', black = '#111111';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // winged RDI badge
+    const rdi = (cx, cy, s) => {
+      x.save(); x.translate(cx, cy);
+      x.fillStyle = black;
+      for (const d of [-1, 1]) {
+        for (let i = 0; i < 4; i++) { x.fillRect(d > 0 ? s * 0.55 : -s * (0.55 + 0.6 - i * 0.12), -s * 0.22 + i * s * 0.13, s * (0.6 - i * 0.12), s * 0.08); }
+      }
+      x.beginPath(); x.ellipse(0, 0, s * 0.6, s * 0.36, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = white; x.beginPath(); x.ellipse(0, 0, s * 0.5, s * 0.27, 0, 0, Math.PI * 2); x.fill();
+      x.fillStyle = black; x.beginPath(); x.ellipse(0, 0, s * 0.44, s * 0.22, 0, 0, Math.PI * 2); x.fill();
+      txt('RDI', 0, -s * 0.02, s * 0.3, white, { weight: 900 });
+      txt('DEVELOPMENT', 0, s * 0.3, s * 0.09, black, { weight: 800 });
+      x.restore();
+    };
+    // big blue/black arc sweeping through the side panels
+    const arc = (w, h, rr, cxF, cyF, rF) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.lineWidth = h * 0.06; x.strokeStyle = sky; x.beginPath(); x.arc(w * cxF, h * cyF, h * rF, Math.PI * 0.55, Math.PI * 1.6); x.stroke();
+      x.lineWidth = h * 0.025; x.strokeStyle = black; x.beginPath(); x.arc(w * cxF, h * cyF, h * (rF - 0.07), Math.PI * 0.55, Math.PI * 1.6); x.stroke();
+      x.restore();
+    };
+    const hoodSide = (w, h, rr) => {
+      x.fillStyle = sky; x.fillRect(0, 0, w, h * 0.1); x.fillStyle = black; x.fillRect(0, h * 0.1, w, h * 0.025);
+      arc(w, h, rr, 0.98, 0.55, 0.42);
+      txt('AME', rr ? w * 0.35 : w * 0.65, h * 0.45, h * 0.3, sky, { stroke: black, sw: 0.05, maxW: w * 0.26 });
+      txt('ELECTRICAL', rr ? w * 0.35 : w * 0.65, h * 0.66, h * 0.08, sky, { weight: 800, maxW: w * 0.24 });
+      txt('WALKER', rr ? w * 0.12 : w * 0.88, h * 0.3, h * 0.08, black, { weight: 800, maxW: w * 0.16 });
+      const lows = [['QUICKCAR', 0.66], ['NEWLIN', 0.82], ['KEIZER', 0.5]];
+      for (const [t, f] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.86, h * 0.08, black, { weight: 800, maxW: w * 0.16 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    // nose: light blue with the white 19
+    const noseSide = (w, h) => {
+      x.fillStyle = sky; x.fillRect(0, 0, w, h);
+      x.fillStyle = black; x.fillRect(0, h * 0.86, w, h * 0.06);
+      txt('19', w * 0.5, h * 0.5, h * 0.78, white, { italic: true, stroke: black, sw: 0.12, maxW: w * 0.6 });
+    };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = sky; x.fillRect(0, 0, w, h); });
+    // cockpit sides: the RDI badge inside the arc
+    const cockSide = (w, h, rr) => {
+      x.fillStyle = sky; x.fillRect(0, 0, w, h * 0.08);
+      x.lineWidth = h * 0.05; x.strokeStyle = sky; x.beginPath(); x.arc(w * 0.5, h * 0.55, h * 0.4, 0, Math.PI * 2); x.stroke();
+      x.lineWidth = h * 0.02; x.strokeStyle = black; x.beginPath(); x.arc(w * 0.5, h * 0.55, h * 0.34, 0, Math.PI * 2); x.stroke();
+      rdi(w * 0.5, h * 0.55, h * 0.42);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: blue top edge, sponsor column, 19AZ toward the back
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = sky; x.fillRect(0, 0, w, h * 0.09); x.fillStyle = black; x.fillRect(0, h * 0.09, w, h * 0.02);
+      const cx = rr ? w * 0.25 : w * 0.75;
+      const items = [['STANTON', 0.2, 0.07], ['FK', 0.31, 0.09], ['DMI', 0.43, 0.08], ['INDY', 0.55, 0.08], ['SMITH TI', 0.67, 0.065], ['FLYING A', 0.78, 0.055]];
+      for (const [t, fy, sz] of items) txt(t, cx, h * fy, h * sz, black, { italic: true, maxW: w * 0.32 });
+      txt('19', rr ? w * 0.6 : w * 0.48, h * 0.44, h * 0.38, sky, { italic: true, stroke: black, sw: 0.14, maxW: w * 0.28 });
+      txt('AZ', rr ? w * 0.6 : w * 0.48, h * 0.66, h * 0.12, black, { italic: true });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = sky; x.fillRect(0, 0, w * 0.12, h); x.fillRect(w * 0.88, 0, w * 0.12, h); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = sky; x.fillRect(0, h * 0.8, w, h * 0.2); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = sky; x.fillRect(0, 0, w * 0.3, h); x.fillStyle = black; x.fillRect(w * 0.3, 0, w * 0.015, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = sky; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('MOLES', 0, 0, w * 0.62, white, { italic: true, stroke: black, sw: 0.14, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 350; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: '#e8eef2', coverLeft: false,
+      number: white, numberOutline: black, numberShadow: sky, paintedTailNumbers: true,
+    };
+  },
+
   // #63 Cale Coons: black car with red and white slash pinstripes, CURB Records
   // in white, Kalitta / Mechanical Advantage sponsor stack on the tail, big
   // silver-white 63 outlined black and red on the back of the tail
