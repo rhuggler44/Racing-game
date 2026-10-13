@@ -256,6 +256,88 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #41 Ricky Lewis: white over black with red and black slashes, Morris Farms
+  // (with the tractor) on the hood, Mesilla Valley Transportation on the
+  // cockpit, Freedom Roofing atop the tall panel, white 41 outlined red on the
+  // black tail, black chassis and wheels
+  lewis41(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f4f4f2', black = '#131313', red = '#e0242c';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = opt.align || 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    const script = '"Snell Roundhand", "Brush Script MT", cursive';
+    // simple tractor silhouette
+    const tractor = (cx, cy, s) => {
+      x.fillStyle = black;
+      x.fillRect(cx - s * 0.5, cy - s * 0.25, s * 0.7, s * 0.25);
+      x.fillRect(cx - s * 0.05, cy - s * 0.65, s * 0.35, s * 0.45);
+      x.fillStyle = white; x.fillRect(cx + s * 0.02, cy - s * 0.58, s * 0.21, s * 0.2);
+      x.fillStyle = black; x.fillRect(cx - s * 0.4, cy - s * 0.55, s * 0.05, s * 0.32);
+      for (const [wx, wr] of [[-s * 0.36, s * 0.17], [s * 0.18, s * 0.28]]) {
+        x.beginPath(); x.arc(cx + wx, cy + s * 0.05, wr, 0, 7); x.fill();
+        x.fillStyle = white; x.beginPath(); x.arc(cx + wx, cy + s * 0.05, wr * 0.45, 0, 7); x.fill(); x.fillStyle = black;
+      }
+    };
+    // hood sides: white top, black bottom, red/black slashes, Morris Farms
+    const hoodSide = (w, h, rr) => {
+      const f = (v) => (rr ? w * v : w * (1 - v));
+      x.fillStyle = black; x.fillRect(0, h * 0.74, w, h * 0.26);
+      x.fillStyle = black; x.beginPath(); x.moveTo(f(0.84), h * 0.74); x.lineTo(f(0.92), h * 0.5); x.lineTo(f(0.95), h * 0.5); x.lineTo(f(0.88), h * 0.74); x.fill();
+      x.fillStyle = red; x.beginPath(); x.moveTo(f(0.9), h * 0.74); x.lineTo(f(0.98), h * 0.46); x.lineTo(f(1), h * 0.46); x.lineTo(f(0.93), h * 0.74); x.fill();
+      txt('MORRIS', f(0.44), h * 0.22, h * 0.28, red, { stroke: black, sw: 0.07, maxW: w * 0.4 });
+      txt('Farms', f(0.4), h * 0.52, h * 0.42, black, { italic: true, weight: 700, font: script, maxW: w * 0.36 });
+      tractor(f(0.7), h * 0.5, h * 0.48);
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { x.fillStyle = black; x.fillRect(0, h * 0.6, w, h * 0.4); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w, h); });
+    // cockpit sides (x = 0 is the back): tall panel with Freedom Roofing up top,
+    // red/black stripe and the sponsor stack; Mesilla Valley up front
+    const cockSide = (w, h) => {
+      x.fillStyle = black; x.fillRect(0, h * 0.86, w, h * 0.14);
+      x.fillStyle = red; x.beginPath(); x.moveTo(0, h * 0.3); x.lineTo(w * 0.32, h * 0.26); x.lineTo(w * 0.32, h * 0.31); x.lineTo(0, h * 0.35); x.fill();
+      x.fillStyle = black; x.beginPath(); x.moveTo(0, h * 0.36); x.lineTo(w * 0.32, h * 0.32); x.lineTo(w * 0.32, h * 0.4); x.lineTo(0, h * 0.44); x.fill();
+      txt('FREEDOM', w * 0.16, h * 0.08, h * 0.08, red, { stroke: black, sw: 0.1, maxW: w * 0.28 });
+      txt('ROOFING', w * 0.16, h * 0.16, h * 0.05, black, { maxW: w * 0.24 });
+      const list = [['DRC', 0.5], ['KEIZER', 0.58], ['SIDEWAZE', 0.66], ['P1', 0.74]];
+      for (const [t, fy] of list) txt(t, w * 0.15, h * fy, h * 0.055, black, { italic: true, maxW: w * 0.26 });
+      x.fillStyle = red; x.beginPath(); x.moveTo(w * 0.42, h * 0.5); x.lineTo(w * 0.5, h * 0.5); x.lineTo(w * 0.47, h * 0.8); x.lineTo(w * 0.39, h * 0.8); x.fill();
+      txt('MESILLA', w * 0.53, h * 0.56, h * 0.07, black, { align: 'left', maxW: w * 0.4 });
+      txt('VALLEY', w * 0.53, h * 0.65, h * 0.07, black, { align: 'left', maxW: w * 0.4 });
+      txt('TRANSPORTATION', w * 0.45, h * 0.76, h * 0.065, black, { align: 'left', maxW: w * 0.52 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail: black, with the white 41 outlined red
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      txt('41', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.44, white, { italic: true, stroke: red, sw: 0.12, maxW: w * 0.3 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w, h); x.fillStyle = red; x.fillRect(w * 0.47, 0, w * 0.06, h); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w, h); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w * 0.2, h); x.fillStyle = red; x.fillRect(w * 0.2, 0, w * 0.015, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('LEWIS', 0, 0, w * 0.6, white, { stroke: red, sw: 0.08, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 350; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.12})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: white, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: red, coverLeft: false,
+      number: white, numberOutline: red, numberShadow: black, paintedTailNumbers: true,
+    };
+  },
+
   // #98 Saban Bibent: white car, royal blue over the top of the tail with an
   // orange slash, giant orange 98 outlined blue, orange Epoxy Systems
   // International, Bibent Lawn Care diamond badge on the tall cockpit panel
