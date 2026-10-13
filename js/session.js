@@ -4,6 +4,7 @@ import { Car, autopilot } from './physics.js';
 import { AIField, SpeedProfile } from './ai.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 export class Session {
   constructor(opts) {
@@ -28,7 +29,8 @@ export class Session {
       const grid = opts.grid;
       const aiEntries = grid ? grid.filter((e) => !e.isPlayer) : null;
       const n = grid ? grid.length : clamp(fieldSize, 2, drivers.length + 1);
-      const aiDrivers = aiEntries ? aiEntries.map((e) => e.driver) : drivers.slice(0, n - 1);
+      // a plain feature: the lineup is drawn fresh every race
+      const aiDrivers = aiEntries ? aiEntries.map((e) => e.driver) : shuffle(drivers.slice(0, n - 1));
       const skills = aiEntries ? new Map(aiEntries.map((e) => [e.driver, e.skill])) : null;
       this.field = new AIField(track, surface, aiDrivers, difficulty, skills);
       this.phase = 'pace';
@@ -87,17 +89,24 @@ export class Session {
     const rows = this.field.cars.map((c) => ({
       name: c.driver.name, number: c.driver.number, colors: c.driver.colors,
       dist: c.S - L, finished: c.finished, finishOrder: c.finishOrder ?? 999, best: c.bestLap, isPlayer: false, ref: c,
-      dnf: false,
+      dnf: false, laps: c.finished ? c.finishLaps : Math.floor((c.S - L) / L), lineTime: c.lineTime ?? 0,
     }));
     rows.push({
       name: this.player.name, number: this.player.number, colors: this.player.colors,
       dist: this.car.S - L, finished: this.playerStatus === 'finished', finishOrder: this.playerFinishOrder ?? 999,
       best: this.bestLap, isPlayer: true, dnf: this.playerStatus === 'dnf',
+      laps: this.playerStatus === 'finished' ? this.playerFinishLaps : Math.floor((this.car.S - L) / L), lineTime: this._pLine ?? 0,
     });
+    // real running order: laps completed first (a lapped car stays a lap down,
+    // even if it takes the checkers ahead of the leader), then who got there first
+    const scoredAtLine = this.phase === 'checkered' || this.phase === 'done';
     rows.sort((a, b) => {
       if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
+      if (a.laps !== b.laps) return b.laps - a.laps;
       if (a.finished && b.finished) return a.finishOrder - b.finishOrder;
-      if (a.finished !== b.finished) return a.finished ? -1 : 1;
+      // once the checkers are out, it's scored at the line: same laps, whoever
+      // crossed first is ahead. Before that, it's where you are on the track.
+      if (scoredAtLine) return a.lineTime - b.lineTime;
       return b.dist - a.dist;
     });
     return rows;
@@ -318,16 +327,19 @@ export class Session {
 
   _finish(c) {
     c.finished = true;
+    c.finishLaps = Math.floor((c.S - this.track.L) / this.track.L);
     this._finishCount = (this._finishCount || 0) + 1;
     c.finishOrder = this._finishCount;
-    if (this._finishCount === 1) this.message(`${c.driver.name} wins!`, 3, true);
+    if (this.standings()[0].ref === c && !this._winnerSaid) { this._winnerSaid = true; this.message(`${c.driver.name} wins!`, 3, true); }
   }
   _finishPlayer() {
     this.playerStatus = 'finished';
+    this.playerFinishLaps = Math.floor((this.car.S - this.track.L) / this.track.L);
     this._finishCount = (this._finishCount || 0) + 1;
     this.playerFinishOrder = this._finishCount;
     this._playerFinishAt = this.raceTime;
     const pos = this.playerPosition();
+    if (pos === 1) this._winnerSaid = true;
     this.message(pos === 1 ? 'YOU WIN!' : `Finished P${pos}`, 4, true);
   }
 

@@ -34,7 +34,7 @@ Best hot laps are saved separately for each track.
 ## What's in v1
 - **Hot laps** with a saved best lap. The track record is 12.276 s (Brady Bacon, 2018).
 - **Race Night**: a full USAC-style show. Qualify with 2 timed laps, then race your 8-lap heat (the field is dealt into heats by qualifying time, fastest few inverted), then the A-Main, lined up by heat finish with the top 6 inverted. The other heats are run in the background, and the track keeps wearing in through the night.
-- **Feature race** against up to 21 AI cars (Rookie, Pro or Outlaw; Outlaw runs right with a near-perfect lap), 10/15/25 laps, with a rolling two-wide start and green/white/checkered flags. Once you take the checkers your finish is locked in (even if you crash after), the computer drives your cool-down lap, and the race wraps up once everyone has taken the flag (15 seconds at most).
+- **Feature race** against up to 21 AI cars (Rookie, Pro or Outlaw; Outlaw runs right with a near-perfect lap). Each race draws a fresh lineup and every car's pace is rolled fresh, so it's a different driver up front each night. Lapped cars are scored a lap down, in real running order., 10/15/25 laps, with a rolling two-wide start and green/white/checkered flags. Once you take the checkers your finish is locked in (even if you crash after), the computer drives your cool-down lap, and the race wraps up once everyone has taken the flag (15 seconds at most).
 - **Track that changes through the night:** it starts tacky, the middle slicks off, and a cushion builds up top.
   - *Dialed In:* a solid bottom and a fast top, so both lines race well.
   - *After Heavy Rain:* tacky and fast early, but the cushion gets tall and choppy and can hook you.

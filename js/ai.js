@@ -9,9 +9,9 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const DIFFICULTY = {
   // pace is a multiple of the track's speed profile. A perfect Easy-handling lap
   // runs about 1.1-1.2x, so Outlaw is right there with a fast player.
-  rookie: { label: 'Rookie', pace: 0.92, spread: 0.035 },
-  pro:    { label: 'Pro',    pace: 1.0, spread: 0.03 },
-  outlaw: { label: 'Outlaw', pace: 1.07, spread: 0.02 },
+  rookie: { label: 'Rookie', pace: 0.96, spread: 0.03 },
+  pro:    { label: 'Pro',    pace: 1.05, spread: 0.025 },
+  outlaw: { label: 'Outlaw', pace: 1.12, spread: 0.02 },
 };
 
 const LANES = 11; // dn 0.05 .. 0.95
@@ -87,6 +87,12 @@ export class SpeedProfile {
   }
 }
 
+// Every car's speed for the night is a fresh roll, so a different driver can be
+// fast (or struggling) each time. Driver ratings aren't used for now.
+export function rollSkill(D, track, rng = Math.random) {
+  return D.pace * (1 + (rng() - 0.5) * 2 * D.spread) * (track.def.aiPace || 1);
+}
+
 export class AICar {
   constructor(driver, skill, groovePref) {
     this.driver = driver;
@@ -113,7 +119,7 @@ export class AIField {
     this.cars = [];
     const D = DIFFICULTY[difficulty] || DIFFICULTY.pro;
     drivers.forEach((drv, i) => {
-      const skill = skills && skills.has(drv) ? skills.get(drv) : (D.pace + (Math.random() - 0.5) * 2 * D.spread + (drv.rating || 0) * 0.01) * (track.def.aiPace || 1);
+      const skill = skills && skills.has(drv) ? skills.get(drv) : rollSkill(D, track);
       const pref = drv.groove ?? (i % 3 === 0 ? 1 : i % 3 === 1 ? -1 : 0);
       this.cars.push(new AICar(drv, skill, pref));
     });

@@ -394,9 +394,9 @@ function showResults() {
   $('results-again').textContent = night ? 'New Night' : 'Race Again';
   const L = track.L, leaderDist = st[0].dist;
   $('results-list').innerHTML = st.map((r, i) => {
-    const down = Math.floor((leaderDist - r.dist) / L + 0.02);
+    const down = st[0].laps - r.laps;
     const status = r.dnf ? 'DNF' : isFinite(r.best) ? r.best.toFixed(3) : '-';
-    const lapsDown = !r.dnf && down >= 1 && !r.finished ? ` (-${down})` : '';
+    const lapsDown = !r.dnf && down >= 1 ? ` (${down} lap${down > 1 ? 's' : ''} down)` : '';
     return `<div class="r ${r.isPlayer ? 'me' : ''}"><span>${i + 1}</span><span class="num" style="background:${r.colors[0]};color:${r.colors[2]};border:1px solid ${r.colors[1]}">${r.number}</span><span>${r.name}${lapsDown}</span><span class="mono">${status}</span></div>`;
   }).join('');
   show('results');

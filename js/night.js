@@ -11,7 +11,7 @@
 //    qualifier ahead, then all the 2nd places, ...), with the top 6 inverted.
 //  - The track keeps changing through the night: tacky for qualifying, it slicks
 //    off through the heats, and the feature starts on a worked-in surface.
-import { DIFFICULTY, SpeedProfile } from './ai.js';
+import { DIFFICULTY, SpeedProfile, rollSkill } from './ai.js';
 
 export const NIGHT = {
   heatLaps: 8,
@@ -31,7 +31,7 @@ export class RaceNight {
     // the AI cars keep the same skill all night
     this.cars = drivers.slice(0, Math.max(1, fieldSize - 1)).map((drv) => ({
       driver: drv,
-      skill: (D.pace + (rng() - 0.5) * 2 * D.spread + (drv.rating || 0) * 0.01) * (track.def.aiPace || 1),
+      skill: rollSkill(D, track, rng),
     }));
     this.entries = [{ driver: player, isPlayer: true }, ...this.cars];
     this.stage = 'qualifying'; // qualifying -> heat -> feature -> done
