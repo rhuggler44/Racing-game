@@ -246,6 +246,83 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #9Z Zack Pretorious: Monster Energy car, flat charcoal with a glowing green
+  // eye and the claw on the cockpit sides, green BEAST graffiti on the hood,
+  // white 9 in a green-outlined box with a green Z on the tail
+  pretorious9z(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const char = '#26282a', black = '#0e0f10', green = '#57e62a', white = '#f4f5f6';
+    x.fillStyle = char; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // Monster claw: three jagged black slashes
+    const claw = (cx, cy, s) => {
+      x.fillStyle = black;
+      for (const dx of [-0.32, 0, 0.32]) {
+        x.beginPath();
+        x.moveTo(cx + (dx - 0.08) * s, cy - 0.7 * s); x.lineTo(cx + (dx + 0.08) * s, cy - 0.7 * s);
+        x.lineTo(cx + (dx + 0.03) * s, cy - 0.1 * s); x.lineTo(cx + (dx + 0.08) * s, cy - 0.05 * s);
+        x.lineTo(cx + dx * s, cy + 0.75 * s); x.lineTo(cx + (dx - 0.05) * s, cy + 0.05 * s);
+        x.lineTo(cx + (dx - 0.1) * s, cy); x.fill();
+      }
+    };
+    // the green eye with the claw in it
+    const eye = (cx, cy, rw, rh) => {
+      const g = x.createRadialGradient(cx, cy, rh * 0.1, cx, cy, rw);
+      g.addColorStop(0, '#eaff8a'); g.addColorStop(0.7, green); g.addColorStop(1, 'rgba(60,160,30,0.2)');
+      x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, rw * 1.25, rh * 1.25, 0, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = green; x.lineWidth = rh * 0.06;
+      x.beginPath(); x.ellipse(cx, cy, rw * 1.3, rh * 1.05, 0, Math.PI * 0.05, Math.PI * 0.95); x.stroke();
+      claw(cx, cy, rh * 0.85);
+    };
+    // hood sides: BEAST graffiti
+    const hoodSide = (w, h, rr) => {
+      txt('BEAST', rr ? w * 0.55 : w * 0.45, h * 0.42, h * 0.48, green, { italic: true, font: '"Marker Felt", "Comic Sans MS", Impact, sans-serif', maxW: w * 0.6 });
+      x.strokeStyle = green; x.lineWidth = h * 0.015;
+      for (let i = 0; i < 6; i++) { const y = h * (0.15 + Math.random() * 0.6); x.beginPath(); x.moveTo(rr ? w * 0.05 : w * 0.95, y); x.lineTo(rr ? w * 0.25 : w * 0.75, y + h * 0.05); x.stroke(); }
+      const lows = [['HOOSIER', 0.15], ['WELD', 0.32], ['DRC', 0.48]];
+      for (const [t, f] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.85, h * 0.07, white, { weight: 800, maxW: w * 0.14 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    // cockpit sides (x = 0 is the back): sponsors at the back, the eye up front
+    const cockSide = (w, h) => {
+      x.fillStyle = green; x.fillRect(0, 0, w, h * 0.05);
+      const list = [['PIZZA KING', 0.12], ['OAK MOTORS', 0.26], ['T.A. SMITH', 0.38], ['FK', 0.5]];
+      for (const [t, fy] of list) txt(t, w * 0.2, h * fy, h * 0.07, white, { maxW: w * 0.32 });
+      eye(w * 0.64, h * 0.5, w * 0.3, h * 0.36);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: white 9 in a rounded green-outlined box, green Z
+    const tailSide = (w, h, rr) => {
+      const cx = rr ? w * 0.58 : w * 0.48, cy = h * 0.5, bw = w * 0.26, bh = h * 0.56;
+      const box = (pad, col) => { x.fillStyle = col; x.beginPath(); x.roundRect(cx - bw / 2 - pad, cy - bh / 2 - pad, bw + pad * 2, bh + pad * 2, h * 0.08); x.fill(); };
+      box(h * 0.05, green); box(h * 0.025, white); box(0, black);
+      txt('9', cx - bw * 0.1, cy - h * 0.03, bh * 0.8, white, { italic: true, maxW: bw * 0.8 });
+      txt('Z', cx + bw * 0.3, cy + bh * 0.28, bh * 0.5, green, { italic: true, stroke: black, sw: 0.14 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { claw(w * 0.5, h * 0.3, h * 0.14); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = green; x.fillRect(w * 0.3, 0, w * 0.01, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('PRETORIOUS', 0, 0, w * 0.5, green, { maxW: h * 0.88 });
+      x.restore();
+    });
+    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#151515', roof: black, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: green, coverLeft: false,
+      number: white, numberOutline: green, numberShadow: black, paintedTailNumbers: true,
+    };
+  },
+
   // #16 Harley Burns: black car with neon green, a big green BrittAero outlined
   // black on the hood sides, green sponsor panel at the back of the cockpit,
   // green pinstripes and a white 16 outlined green on the black tail
