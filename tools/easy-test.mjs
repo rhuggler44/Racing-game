@@ -21,6 +21,15 @@ for (const prep of ['dialed', 'slick']) {
   }
 }
 
+// 1b) straightaway, wheel centered, any throttle: the car should go straight
+for (const thr of [0.5, 1.0]) {
+  const surf = new Surface(track, 'slick'), car = new Car(track, surf);
+  car.handling = 'easy';
+  car.reset(track.turnZones[4].s0 + 2, 0, 25);   // start of the backstretch
+  for (let i = 0; i < 120 * 1.6; i++) car.step(1 / 120, { steer: 0, throttle: thr, brake: 0 });
+  console.log(`straightaway, wheel centered, throttle ${thr}: drifted ${car.d.toFixed(2)} m sideways over ${(car.s - track.turnZones[4].s0 - 2).toFixed(0)} m`);
+}
+
 // 2) "human-ish" driver: steer to hold a lane, throttle to hit a target speed
 function drive(prep, dn, factor, laps = 4) {
   const surf = new Surface(track, prep), car = new Car(track, surf);

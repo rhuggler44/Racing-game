@@ -239,8 +239,17 @@ export class Car {
   //    and the car pushes up the track toward the cushion
   _easy(dt, inp, sm, mu, crr, bank, aIn) {
     const P = this.p, surf = this.surface;
-    const thr = clamp(inp.throttle, 0, 1), brk = clamp(inp.brake, 0, 1), steer = clamp(inp.steer, -1, 1);
+    let thr = clamp(inp.throttle, 0, 1);
+    const brk = clamp(inp.brake, 0, 1), steer = clamp(inp.steer, -1, 1);
     const wrap = (a) => (a > Math.PI ? a - 2 * Math.PI : a < -Math.PI ? a + 2 * Math.PI : a);
+    // throttle assist (with driving aids on): a little traction control that eases
+    // the gas when you're spinning the tires so much the car pushes up the track,
+    // or it's getting too sideways. Helps most coming off the turns on a slick track.
+    if (this.assists) {
+      const over = (this.pushing ? 0.25 : 0) + Math.max(0, (this._slide || 0) - 0.5) * 1.5;
+      this._tcCut = (this._tcCut || 0) + (clamp(over, 0, 0.45) - (this._tcCut || 0)) * Math.min(1, dt * 6);
+      thr *= 1 - this._tcCut;
+    }
     let c = Math.cos(this.th), s = Math.sin(this.th);
     let vx = this.u * c - this.v * s, vz = this.u * s + this.v * c;
     const sp = Math.hypot(vx, vz);
@@ -250,8 +259,11 @@ export class Car {
 
     // ---- slide angle (nose left of the direction of travel) ----
     const loose = clamp(1.95 - mu / 1.3, 0.6, 1.15);          // slicker clay = steps out easier
-    const cornering = clamp(Math.abs(this._pathRate || 0) / 0.4, 0, 1);
-    let slideT = thr * (0.14 + 0.8 * cornering) * loose        // gas: rear steps out, more so mid-corner
+    // Stagger only takes over in the turns. Like a real car with the wheel offset,
+    // centered steering goes straight down the straightaways; the stagger builds as
+    // you enter the corner and is at full strength mid-turn, the same spot every lap.
+    const cornering = this.track.kMax ? clamp(sm.k / this.track.kMax, 0, 1) : 0;
+    let slideT = thr * 0.94 * cornering * loose                 // gas: rear steps out in the turns
       + Math.max(0, -steer) * 0.22 * cornering                   // turning in sharpens it
       - Math.max(0, steer) * 0.3;                                // countersteer catches it
     slideT = clamp(slideT, -0.12, this.assists ? 0.7 : 0.95) * sf;
@@ -260,7 +272,7 @@ export class Car {
 
     // ---- how fast the path turns ----
     const steerRate = steer * (0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
-    let turn = steerRate - slide * 1.6 - 0.04 * sf;   // + right, - left (stagger pulls left)
+    let turn = steerRate - slide * 1.85 - 0.06 * sf * cornering;   // + right, - left (stagger pulls left in turns)
     if (fwd < 0) turn = -steer * 0.8;
     const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 1.8);
     let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));
@@ -284,8 +296,11 @@ export class Car {
     vz = Math.sin(ang) * Math.abs(speed) * Math.sign(speed || 1);
     if (speed < 0) { vx = -Math.cos(this.th) * -speed; vz = -Math.sin(this.th) * -speed; }
 
-    // banking + cushion push the car down the track
-    vx += -sm.nx * aIn * dt; vz += -sm.nz * aIn * dt;
+    // banking + cushion push the car down the track; on the straights the tires hold
+    // against the little bit of banking, so centered steering stays straight
+    const aBank = G * Math.sin(bank) * Math.cos(bank);
+    const aSide = aIn - aBank * (1 - cornering);
+    vx += -sm.nx * aSide * dt; vz += -sm.nz * aSide * dt;
 
     // cushion: choppy conditions can still hook you
     this.hookCooldown = Math.max(0, this.hookCooldown - dt);
