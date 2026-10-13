@@ -256,6 +256,77 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #98 Saban Bibent: white car, royal blue over the top of the tail with an
+  // orange slash, giant orange 98 outlined blue, orange Epoxy Systems
+  // International, Bibent Lawn Care diamond badge on the tall cockpit panel
+  bibent98(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f3f3f1', blue = '#2b3fd1', orange = '#ff5a14', black = '#151515';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // Bibent Lawn Care: blue diamond with an orange stripe
+    const bibent = (cx, cy, s) => {
+      x.save(); x.translate(cx, cy);
+      x.fillStyle = blue; x.beginPath(); x.moveTo(0, -s); x.lineTo(s * 0.8, 0); x.lineTo(0, s); x.lineTo(-s * 0.8, 0); x.fill();
+      x.fillStyle = orange; x.beginPath(); x.moveTo(-s * 0.55, -s * 0.31); x.lineTo(s * 0.55, -s * 0.31); x.lineTo(s * 0.45, -s * 0.2); x.lineTo(-s * 0.45, -s * 0.2); x.fill();
+      txt('BIBENT', 0, s * 0.02, s * 0.32, white, { maxW: s * 1.25 });
+      txt('LAWN CARE', 0, s * 0.3, s * 0.14, orange, { weight: 800, maxW: s * 0.9 });
+      x.restore();
+    };
+    const epoxy = (cx, cy, s, maxW) => {
+      txt('EPOXY', cx, cy, s, orange, { italic: true, stroke: blue, sw: 0.08, maxW });
+      txt('SYSTEMS INTERNATIONAL', cx, cy + s * 0.7, s * 0.3, orange, { weight: 800, maxW });
+    };
+    const hoodSide = (w, h, rr) => {
+      epoxy(rr ? w * 0.68 : w * 0.32, h * 0.38, h * 0.32, w * 0.42);
+      const lows = [['K&N', 0.88], ['HOOSIER', 0.7], ['FLORACING', 0.5], ['NOS', 0.32]];
+      for (const [t, f] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.86, h * 0.07, black, { weight: 800, maxW: w * 0.14 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    P.flat(R.noseSideL, true, () => {}); P.flat(R.noseSideR, false, () => {});
+    // cockpit sides (x = 0 is the back): the tall panel with the sponsor stack
+    const cockSide = (w, h) => {
+      txt('SIGNS BY TREY', w * 0.14, h * 0.1, h * 0.05, blue, { maxW: w * 0.24 });
+      txt('NATURE CALLS', w * 0.14, h * 0.19, h * 0.05, orange, { maxW: w * 0.24 });
+      bibent(w * 0.18, h * 0.42, h * 0.16);
+      epoxy(w * 0.66, h * 0.62, h * 0.12, w * 0.5);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: blue sweep over the top, orange slash, giant 98
+    const tailSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.fillStyle = blue;
+      x.beginPath(); x.moveTo(0, 0); x.lineTo(w, 0); x.lineTo(w, h * 0.55); x.quadraticCurveTo(w * 0.55, h * 0.3, 0, h * 0.42); x.fill();
+      x.fillStyle = orange;
+      x.beginPath(); x.moveTo(w * 0.15, 0); x.lineTo(w * 0.42, 0); x.quadraticCurveTo(w * 0.3, h * 0.2, w * 0.2, h * 0.38); x.lineTo(w * 0.05, h * 0.42); x.quadraticCurveTo(w * 0.12, h * 0.2, w * 0.15, 0); x.fill();
+      x.restore();
+      txt('98', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.44, orange, { stroke: blue, sw: 0.14, maxW: w * 0.34 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, 0, w, h); x.fillStyle = orange; x.fillRect(w * 0.42, 0, w * 0.16, h); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, 0, w, h * 0.45); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, 0, w * 0.06, h); x.fillRect(w * 0.94, 0, w * 0.06, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = blue; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('BIBENT', 0, 0, w * 0.6, white, { stroke: orange, sw: 0.08, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 500; i++) { x.fillStyle = `rgba(120,95,70,${0.06 + Math.random() * 0.14})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#151515', roof: black, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: orange, coverLeft: false,
+      number: orange, numberOutline: blue, numberShadow: white, paintedTailNumbers: true,
+    };
+  },
+
   // #34 Shane Cottle: white car with a maroon cage and chassis, double maroon
   // swoosh down the sides, maroon hood scoop, Lucas Oil Products badge, maroon
   // 34 outlined white on the nose, slate-blue COTTLE plate, black wheels
