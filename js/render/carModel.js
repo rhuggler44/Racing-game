@@ -246,6 +246,71 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #30 CJ Leary: black car with a bright blue band, giant white LEARY
+  // Construction outlined black, white sponsor stack on the cockpit sides,
+  // white nose, huge white 30 outlined blue on the black tail, black wheels
+  leary30(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const black = '#121214', blue = '#1f7fe6', white = '#f4f5f6';
+    x.fillStyle = black; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // hood sides: blue band with the giant LEARY / CONSTRUCTION, black below
+    const hoodSide = (w, h, rr) => {
+      x.fillStyle = blue;
+      x.beginPath(); x.moveTo(0, 0); x.lineTo(w, 0); x.lineTo(w, rr ? h * 0.78 : h * 0.62); x.lineTo(0, rr ? h * 0.62 : h * 0.78); x.fill();
+      txt('LEARY', w * 0.5, h * 0.27, h * 0.56, white, { stroke: black, sw: 0.1, maxW: w * 0.9 });
+      txt('CONSTRUCTION', w * 0.5, h * 0.58, h * 0.16, white, { stroke: black, sw: 0.14, maxW: w * 0.8 });
+      const lows = [['SPRINT CAR', 0.2], ['FLORACING', 0.42], ['HOOSIER', 0.62], ['K&N', 0.8]];
+      for (const [t, f] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.88, h * 0.07, white, { weight: 800, maxW: w * 0.16 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    // nose: white with a small sponsor column
+    const noseSide = (w, h) => {
+      x.fillStyle = white; x.fillRect(0, 0, w, h);
+      txt('DMI', w * 0.3, h * 0.35, h * 0.22, black, { maxW: w * 0.3 });
+      txt('KRAMER', w * 0.7, h * 0.35, h * 0.16, black, { maxW: w * 0.3 });
+      txt('ULTRA-SHIELD', w * 0.5, h * 0.7, h * 0.14, black, { maxW: w * 0.6 });
+    };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = white; x.fillRect(0, 0, w, h); });
+    // cockpit sides: white sponsor stack at the back, blue up front with more sponsors
+    const cockSide = (w, h) => {
+      x.fillStyle = blue; x.fillRect(0, 0, w, h);
+      x.fillStyle = white; x.fillRect(0, 0, w * 0.5, h);
+      const top = [['FK ROD ENDS', 0.08], ['DRC CHASSIS', 0.18], ['SIMPSON', 0.28], ['wilwood', 0.37], ['ASC', 0.45]];
+      for (const [t, fy] of top) txt(t, w * 0.25, h * (0.15 + fy * 1.4), h * 0.08, black, { maxW: w * 0.42 });
+      const low = [['INDY', 0.57], ["MURRAY'S", 0.67], ['TRAVIS ESH', 0.77], ['KODIAK', 0.87]];
+      for (const [t, fy] of low) txt(t, w * 0.72, h * (fy * 1.4 - 0.6), h * 0.08, white, { stroke: black, sw: 0.1, maxW: w * 0.4 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: black with the huge 30 outlined in blue
+    const tailSide = (w, h, rr) => {
+      txt('30', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.42, white, { stroke: blue, sw: 0.14, maxW: w * 0.32 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, h * 0.5, w, h * 0.06); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = blue; x.fillRect(w * 0.3, 0, w * 0.7, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = blue; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('LEARY', 0, 0, w * 0.6, white, { stroke: black, sw: 0.14, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 350; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: blue, coverLeft: false,
+      number: white, numberOutline: blue, numberShadow: black, paintedTailNumbers: true,
+    };
+  },
+
   // #12 Robert Ballou: red car, white chassis and cage, white upper tail with
   // J.B. Hinchman Indianapolis, gold Suburban Subaru with the arrow, gold 12 on
   // a starred blue panel, BALLOU plate, Engler ovals, polished rims
