@@ -39,7 +39,8 @@ export const ELDORA = {
   ramp: 45,
   width: 24,
   bankTurn: 20 * DEG,
-  bankStraight: 6 * DEG,
+  bankStraight: 8 * DEG, // a little banking on the straights too
+  bankBlend: 40,         // roll into / out of the banks over ~80 m
   recordLap: null,
   layout: 'walled',     // wall right at the edge all the way around
   inner: { apron: 2.4, edge: 2.9, wall: true },
@@ -66,6 +67,18 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   {
     let s0 = 0;
     for (const [len, kind] of segs) { turnZones.push({ s0, s1: s0 + len, kind }); s0 += len; }
+  }
+  // curvature of the turns only (the backstretch bend doesn't count): used for banking
+  function turnCurv(s) {
+    let s0 = 0;
+    for (const [len, kind] of segs) {
+      if (s < s0 + len) {
+        const t = (s - s0) / len;
+        return kind === 's' ? 0 : kind === 'arc' ? kMax : kind === 'in' ? kMax * t : kMax * (1 - t);
+      }
+      s0 += len;
+    }
+    return 0;
   }
   function curv(s) {
     let s0 = 0;
@@ -114,7 +127,27 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
     const l = Math.hypot(dx, dz); dx /= l; dz /= l;
     tx[i] = dx; tz[i] = dz;
     nx[i] = -dz; nz[i] = dx; // outward (right of travel)
-    bank[i] = def.bankStraight + (def.bankTurn - def.bankStraight) * (k[i] / kMax);
+  }
+  // banking follows the turns, not the backstretch bend. def.bankBlend (meters)
+  // spreads the change out so the track rolls into and out of the banks
+  // gradually instead of all inside the turn-entry spiral.
+  const tf = new Float64Array(N);
+  for (let i = 0; i < N; i++) tf[i] = turnCurv(i * ds) / kMax;
+  const blend = Math.round((def.bankBlend || 0) / ds);
+  let bf = tf;
+  for (let pass = 0; pass < 2 && blend > 0; pass++) {
+    const out = new Float64Array(N);
+    let acc = 0;
+    for (let o = -blend; o <= blend; o++) acc += bf[(o + N) % N];
+    for (let i = 0; i < N; i++) {
+      out[i] = acc / (2 * blend + 1);
+      acc += bf[(i + blend + 1) % N] - bf[(i - blend + N) % N];
+    }
+    bf = out;
+  }
+  for (let i = 0; i < N; i++) {
+    const f = Math.min(1, bf[i]);
+    bank[i] = def.bankStraight + (def.bankTurn - def.bankStraight) * (blend > 0 ? f * f * (3 - 2 * f) : f);
   }
 
   const W = def.width;
