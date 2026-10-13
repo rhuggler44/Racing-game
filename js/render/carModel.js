@@ -246,6 +246,87 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #5T Jake Swanson: white car with red/black stripes along the top edges,
+  // SNAKE Enterprises + Inland Rigging on the hood sides, black sponsor panel on
+  // the front of the tail, big black 5T outlined in red on the back of the tail
+  swanson5t(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f6f6f3', red = '#d61f2c', black = '#111111';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    const topStripes = (w, h, at = 0.06) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h * at);
+      x.fillStyle = red; x.fillRect(0, h * at, w, h * 0.06);
+    };
+    // hood sides: Inland Rigging toward the front, SNAKE Enterprises toward the cockpit
+    const hoodSide = (w, h, rr) => {
+      topStripes(w, h, 0.05);
+      x.fillStyle = red; x.fillRect(0, h * 0.9, w, h * 0.1);
+      const front = (f) => (rr ? w * f : w * (1 - f)); // f measured from the front of the car
+      txt('INLAND', front(0.24), h * 0.3, h * 0.2, black, { maxW: w * 0.3 });
+      txt('RIGGING', front(0.24), h * 0.5, h * 0.2, black, { maxW: w * 0.32 });
+      txt('Machinery Moving & Warehousing', front(0.24), h * 0.68, h * 0.07, black, { italic: true, weight: 700, maxW: w * 0.34 });
+      txt('SNAKE', front(0.66), h * 0.42, h * 0.4, black, { italic: true, maxW: w * 0.42 });
+      txt('ENTERPRISES', front(0.68), h * 0.72, h * 0.1, black, { weight: 700, maxW: w * 0.32 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { topStripes(w, h, 0.08); x.fillStyle = red; x.fillRect(0, h * 0.86, w, h * 0.14); txt('CSI', w * 0.5, h * 0.5, h * 0.26, black, { maxW: w * 0.5 }); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides: a cluster of small sponsors
+    const cockSide = (w, h) => {
+      topStripes(w, h, 0.07);
+      const items = [['DIRTROOTS', 0.25, 0.3], ['BURRIS', 0.72, 0.3], ['APACHE', 0.25, 0.46], ['DRIVE-IN', 0.72, 0.46], ['LOCKE', 0.22, 0.62], ['JST', 0.5, 0.62], ['RedDriver', 0.78, 0.62], ['CK ENTERPRISES', 0.5, 0.78]];
+      for (const [t, fx, fy] of items) txt(t, w * fx, h * fy, h * 0.075, black, { weight: 800, maxW: w * 0.42 });
+      x.fillStyle = red; x.fillRect(0, h * 0.9, w, h * 0.1);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: black sponsor panel up front, 5T on the back half
+    const tailSide = (w, h, rr) => {
+      const fx = rr ? 0 : w * 0.52;
+      x.fillStyle = black; x.fillRect(fx, 0, w * 0.48, h * 0.86);
+      x.fillStyle = red; x.fillRect(fx, h * 0.86, w * 0.48, h * 0.06);
+      x.beginPath(); x.moveTo(fx, h * 0.12); x.lineTo(fx + w * 0.48, 0); x.lineTo(fx + w * 0.48, h * 0.04); x.lineTo(fx, h * 0.16); x.fill();
+      const cx = fx + w * 0.24;
+      x.strokeStyle = white; x.lineWidth = h * 0.012; x.save(); x.translate(cx, h * 0.3); x.rotate(Math.PI / 4); x.strokeRect(-h * 0.08, -h * 0.08, h * 0.16, h * 0.16); x.restore();
+      txt('ROLLS', cx, h * 0.28, h * 0.04, white, { weight: 800 });
+      txt('SCAFFOLD', cx, h * 0.32, h * 0.04, white, { weight: 800 });
+      txt('DOUGHBOYZ', cx, h * 0.48, h * 0.075, white, { maxW: w * 0.42 });
+      txt('FINE LINE', cx, h * 0.62, h * 0.085, white, { maxW: w * 0.42 });
+      txt('DRAFTING', cx, h * 0.74, h * 0.085, white, { weight: 700, maxW: w * 0.42 });
+      // the number on the back of the tail: black with a red outline
+      const nx = rr ? w * 0.7 : w * 0.3;
+      x.font = `italic 900 ${Math.floor(h * 0.56)}px "Arial Black", Arial, sans-serif`;
+      x.lineWidth = h * 0.1; x.strokeStyle = red; x.strokeText('5T', nx, h * 0.5, w * 0.4);
+      x.lineWidth = h * 0.04; x.strokeStyle = white; x.strokeText('5T', nx, h * 0.5, w * 0.4);
+      x.fillStyle = black; x.fillText('5T', nx, h * 0.5, w * 0.4);
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    // tail top: black up front with the red stripe, white behind
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = black; x.fillRect(0, h * 0.55, w, h * 0.45); x.fillStyle = red; x.fillRect(0, h * 0.5, w, h * 0.05); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = red; x.fillRect(0, h * 0.82, w, h * 0.08); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = black; x.fillRect(w * 0.72, 0, w * 0.28, h); x.fillStyle = red; x.fillRect(w * 0.68, 0, w * 0.04, h); });
+    // cage plate: DOUGHERTY
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = white; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('DOUGHERTY', 0, 0, w * 0.55, black, { italic: true, maxW: h * 0.9 });
+      x.restore();
+    });
+    for (let i = 0; i < 500; i++) { x.fillStyle = `rgba(40,30,25,${0.06 + Math.random() * 0.12})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#dfe3e6', helmet: '#f6f6f3', coverLeft: false,
+      number: black, numberOutline: red, numberShadow: white, paintedTailNumbers: true,
+    };
+  },
+
   // #3P Kyle Cummins: white car, giant red AVANTI over a black arrow on the hood
   // sides, red tail front with the sponsor stack, red roof, 3P on the tail
   cummins3p(drv) {
