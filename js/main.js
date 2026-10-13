@@ -438,7 +438,7 @@ function updateCamera(dt) {
 }
 
 // ---------------- main loop ----------------
-let last = performance.now(), stuckT = 0, attractT = 0;
+let last = performance.now(), stuckT = 0, offT = 0, attractT = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
@@ -534,7 +534,10 @@ function renderSession(dt) {
   const sm = track.sample(car.s, _sm);
   const dirDot = Math.cos(car.th) * sm.tx + Math.sin(car.th) * sm.tz;
   if (!paused && s.playerStatus === 'running' && s.phase !== 'pace' && (car.speed < 1.5 || dirDot < -0.2)) stuckT += dt; else stuckT = 0;
-  $('btn-reset').classList.toggle('hidden', stuckT < 2);
+  // off in the grass or the runoff for a while: offer a quick way back
+  const offTrack = car.surfaceKind === 'grass' || car.surfaceKind === 'offtrack';
+  if (!paused && s.playerStatus === 'running' && s.phase !== 'pace' && offTrack) offT += dt; else offT = 0;
+  $('btn-reset').classList.toggle('hidden', stuckT < 2 && offT < 3);
 
   sound.update({
     rpm: car.flipped ? 2500 : car.rpm, throttle: input.throttle, slip: Math.abs(car.beta) + car.spin * 0.3, speed: car.speed,

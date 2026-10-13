@@ -87,14 +87,18 @@ export class Car {
     // surface
     let mu, crr = P.Crr, bank = sm.bank, berm = 0, aOut = 0;
     const eOut = this.d - W / 2;
-    if (this.d < -W / 2 - 1.5) { mu = 0.62; crr = 0.12; bank = 0; this.surfaceKind = 'grass'; }
+    if (this.d < -W / 2 - 1.5) { mu = 0.72; crr = 0.07; bank = 0; this.surfaceKind = 'grass'; }
     else if (this.d < -W / 2) { mu = surf.grip(0) * 0.85; crr = 0.05; bank = 0; this.surfaceKind = 'apron'; }
     else if (eOut > 0.4) {
-      // off the outside edge: grass, and the ground falls away
-      mu = 0.6; crr = 0.09; bank = 0; this.surfaceKind = 'offtrack';
-      const slope = (t.outsideY(this.s, eOut) - t.outsideY(this.s, eOut + 0.5)) / 0.5;
-      aOut = G * Math.sin(Math.atan(Math.max(0, slope)));
-      if (t.zones(this.s).kind === 'drop' && eOut > 3.2 && !this.flipped) {
+      // off the outside edge: grass and runoff. Only the hill in turns 1-2 pulls
+      // the car away; everywhere else you can drive it back on.
+      mu = 0.72; crr = 0.06; bank = 0; this.surfaceKind = 'offtrack';
+      const drop = t.zones(this.s).kind === 'drop';
+      if (drop) {
+        const slope = (t.outsideY(this.s, eOut) - t.outsideY(this.s, eOut + 0.5)) / 0.5;
+        aOut = 0.55 * G * Math.sin(Math.atan(Math.max(0, slope))); // a quick catch can still save it
+      }
+      if (drop && eOut > 3.2 && !this.flipped) {
         this.flipped = true;
         this.flipCause = 'bank';
         this.events.push({ type: 'flip', strength: this.speed, cause: 'bank' });
@@ -258,30 +262,34 @@ export class Car {
     const sf = clamp((sp - 4) / 10, 0, 1);
 
     // ---- slide angle (nose left of the direction of travel) ----
+    // off the track (infield grass or the runoff) there's no banking or cushion to
+    // slide against: the car just goes where you point it so you can get back on
+    const off = this.surfaceKind === 'grass' || this.surfaceKind === 'offtrack';
     const loose = clamp(1.95 - mu / 1.3, 0.6, 1.15);          // slicker clay = steps out easier
     // Stagger only takes over in the turns. Like a real car with the wheel offset,
     // centered steering goes straight down the straightaways; the stagger builds as
     // you enter the corner and is at full strength mid-turn, the same spot every lap.
-    const cornering = this.track.kMax ? clamp(sm.k / this.track.kMax, 0, 1) : 0;
+    const cornering = this.track.kMax && !off ? clamp(sm.k / this.track.kMax, 0, 1) : 0;
     let slideT = thr * 0.94 * cornering * loose                 // gas: rear steps out in the turns
       + Math.max(0, -steer) * 0.22 * cornering                   // turning in sharpens it
       - Math.max(0, steer) * 0.3;                                // countersteer catches it
-    slideT = clamp(slideT, -0.12, this.assists ? 0.7 : 0.95) * sf;
+    slideT = off ? 0 : clamp(slideT, -0.12, this.assists ? 0.7 : 0.95) * sf;
     this._slide = (this._slide || 0) + (slideT - (this._slide || 0)) * Math.min(1, dt * (slideT > (this._slide || 0) ? 2.6 : 3.4));
     const slide = this._slide;
 
     // ---- how fast the path turns ----
-    const steerRate = steer * (0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
+    const steerRate = steer * (off ? 1.1 + 0.7 * clamp(1 - sp / 25, 0, 1) : 0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
     let turn = steerRate - slide * 1.85 - 0.06 * sf * cornering;   // + right, - left (stagger pulls left in turns)
     if (fwd < 0) turn = -steer * 0.8;
     const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 1.8);
     let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));
     if (sp > this.speedLimit) aDrive = 0;
     // grip of the clay, minus what wheelspin is using up
-    const aCap = Math.sqrt(Math.max(0.1, (mu * G * loadMul) ** 2 - (aDrive * 0.55) ** 2));
+    const muTurn = off ? Math.max(mu, 0.95) : mu;
+    const aCap = Math.sqrt(Math.max(0.1, (muTurn * G * loadMul) ** 2 - (aDrive * 0.55) ** 2));
     this.pushing = sp * Math.abs(turn) > aCap;
     if (this.pushing && sp > 1) turn = Math.sign(turn) * aCap / sp;
-    if (sp < 3) turn *= sp / 3;
+    if (off) { if (sp < 1.2) turn *= sp / 1.2; } else if (sp < 3) turn *= sp / 3;
     ang = wrap(ang + turn * dt);
 
     // ---- speed ----
