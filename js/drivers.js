@@ -9,6 +9,9 @@ export const PLAYER = {
 };
 
 export const DRIVERS = [
+  // real cars (custom paint in js/render/carModel.js -> CUSTOM_LIVERIES)
+  { name: 'Trey Osborne',    number: '6T',  colors: ['#ffffff', '#ff7a1a', '#ff7a1a'], rating: 1.3, livery: 'osborne6t' },
+  // placeholder field
   { name: 'Cody Barrows',    number: '4',   colors: ['#c8102e', '#ffffff', '#ffffff'], rating: 1.5 },
   { name: 'Jace Whitfield',  number: '11',  colors: ['#0033a0', '#ffd100', '#ffffff'], rating: 1.2 },
   { name: 'Mason Kreider',   number: '7K',  colors: ['#f5f5f5', '#111111', '#111111'], rating: 1.0 },

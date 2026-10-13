@@ -177,6 +177,7 @@ function atlasTexture(c) {
 
 // Generated iRacing-style paint for AI cars (same layout, 1/4 size).
 function aiAtlas(drv) {
+  if (drv.livery && CUSTOM_LIVERIES[drv.livery]) return CUSTOM_LIVERIES[drv.livery](drv);
   const S = 512, k = S / ATLAS;
   const c = canvas(S, S), x = c.getContext('2d');
   const [body, accent, numCol] = drv.colors;
@@ -226,6 +227,106 @@ function aiAtlas(drv) {
   return { canvas: c, chassis: '#151515', roof: body, rim: '#cfd3d6', number: numCol === '#ffffff' && base === '#ffffff' ? '#111111' : numCol, numberOutline: base === '#ffffff' ? '#ffffff' : '#111111', helmet: accent, coverLeft: false };
 }
 
+// ---------------- custom liveries for real cars ----------------
+// Paint in "viewer space" for each side panel: (0,0) is the top-left of the panel
+// as you see it standing beside the car, w x h is its size; rearRight tells you
+// which end is the back of the car.
+function sidePainter(x, k) {
+  const R = PAINT_REGIONS;
+  const at = (r) => [r[0] * k, r[1] * k, (r[2] - r[0]) * k, (r[3] - r[1]) * k];
+  return {
+    // hood / nose / left tail sides read straight across the image
+    flat(r, rearRight, fn) { const [x0, y0, w, h] = at(r); x.save(); x.translate(x0, y0); x.beginPath(); x.rect(0, 0, w, h); x.clip(); fn(w, h, rearRight); x.restore(); },
+    // cockpit side panels are laid out rotated 90 degrees
+    rot90(r, rearRight, fn) { const [x0, y0, w, h] = at(r); x.save(); x.translate(x0, y0 + h); x.rotate(-Math.PI / 2); x.beginPath(); x.rect(0, 0, h, w); x.clip(); fn(h, w, rearRight); x.restore(); },
+    // the right tail side is laid out upside down
+    rot180(r, rearRight, fn) { const [x0, y0, w, h] = at(r); x.save(); x.translate(x0 + w, y0 + h); x.rotate(Math.PI); x.beginPath(); x.rect(0, 0, w, h); x.clip(); fn(w, h, rearRight); x.restore(); },
+    R,
+  };
+}
+
+const CUSTOM_LIVERIES = {
+  // #6T Trey Osborne: white car, orange-to-yellow fade up top and on the tail,
+  // red-orange sweep on the hood sides with the IHI / Industrial Hydraulics logo
+  osborne6t(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f7f7f4', red = '#e8401c', orange = '#ff7a1a', yellow = '#ffc21a', black = '#151515';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const fade = (w, h, vertical) => {
+      const g = vertical ? x.createLinearGradient(0, h, 0, 0) : x.createLinearGradient(0, 0, w, 0);
+      g.addColorStop(0, yellow); g.addColorStop(0.55, orange); g.addColorStop(1, red);
+      return g;
+    };
+    // hood sides: red-orange sweep rising toward the cockpit, IHI logo, sponsor text
+    const hoodSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); } // draw with the rear on the right
+      const g = x.createLinearGradient(w * 0.3, h, w, 0); g.addColorStop(0, orange); g.addColorStop(1, red);
+      x.fillStyle = g;
+      x.beginPath(); x.moveTo(w * 0.22, h); x.quadraticCurveTo(w * 0.62, h * 0.55, w, h * 0.02); x.lineTo(w, h * 0.5); x.quadraticCurveTo(w * 0.7, h * 0.85, w * 0.48, h); x.fill();
+      x.fillStyle = black; // black stripe by the cockpit
+      x.beginPath(); x.moveTo(w * 0.86, 0); x.lineTo(w * 0.92, 0); x.lineTo(w * 0.8, h); x.lineTo(w * 0.74, h); x.fill();
+      x.fillStyle = '#ffd400'; x.fillRect(0, h * 0.94, w, h * 0.06);
+      x.restore();
+      // IHI oval and lettering (always drawn readable)
+      const cx = rr ? w * 0.56 : w * 0.44, cy = h * 0.33;
+      x.fillStyle = white; x.strokeStyle = red; x.lineWidth = h * 0.05;
+      x.beginPath(); x.ellipse(cx, cy, w * 0.17, h * 0.27, 0, 0, Math.PI * 2); x.fill(); x.stroke();
+      x.fillStyle = red; x.font = `900 ${Math.floor(h * 0.38)}px "Times New Roman", Georgia, serif`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('IHI', cx, cy + h * 0.01);
+      x.fillStyle = black; x.font = `800 ${Math.floor(h * 0.17)}px Arial, sans-serif`;
+      x.fillText('Industrial', rr ? w * 0.6 : w * 0.4, h * 0.68);
+      x.fillText('Hydraulics, Inc.', rr ? w * 0.6 : w * 0.4, h * 0.86);
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h, rr) => {
+      x.fillStyle = orange; x.fillRect(0, h * 0.82, w, h * 0.18);
+      x.fillStyle = black; x.font = `800 ${Math.floor(h * 0.2)}px Arial, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('IHI', w * 0.5, h * 0.45);
+    };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides: orange fade up top, black stripe, small sponsors
+    const cockSide = (w, h, rr) => {
+      x.fillStyle = fade(w, h, true); x.fillRect(0, 0, w, h * 0.3);
+      x.fillStyle = black;
+      x.beginPath(); x.moveTo(rr ? w * 0.08 : w * 0.82, h * 0.3); x.lineTo(rr ? w * 0.2 : w * 0.94, h * 0.3); x.lineTo(rr ? w * 0.34 : w * 0.66, h); x.lineTo(rr ? w * 0.22 : w * 0.54, h); x.fill();
+      x.font = `900 ${Math.floor(h * 0.1)}px Arial, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+      x.fillText('HHH', w * 0.55, h * 0.42);
+      x.font = `800 ${Math.floor(h * 0.075)}px Arial, sans-serif`;
+      x.fillText("SHOEMAKER'S", w * 0.55, h * 0.56);
+      x.fillStyle = red; x.fillText('RACING', w * 0.55, h * 0.68);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: orange-to-yellow fade on the lower tail
+    const tailSide = (w, h) => {
+      const g = x.createLinearGradient(0, h * 0.3, 0, h); g.addColorStop(0, 'rgba(255,194,26,0)'); g.addColorStop(0.45, yellow); g.addColorStop(1, orange);
+      x.fillStyle = g; x.fillRect(0, 0, w, h);
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    // tail top + rear: orange fade
+    P.flat(R.tailTop, true, (w, h) => { const g = x.createLinearGradient(0, h, 0, 0); g.addColorStop(0, yellow); g.addColorStop(0.6, orange); g.addColorStop(1, red); x.fillStyle = g; x.fillRect(0, 0, w, h); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = fade(w, h, true); x.fillRect(0, 0, w, h); });
+    // hood top: white, orange sweep near the cockpit
+    P.flat(R.hoodTop, true, (w, h) => { const g = x.createLinearGradient(w * 0.55, 0, w, 0); g.addColorStop(0, 'rgba(255,122,26,0)'); g.addColorStop(0.5, orange); g.addColorStop(1, red); x.fillStyle = g; x.fillRect(0, 0, w, h); });
+    // cage name plate: "TALL"
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = fade(w, h, true); x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      x.fillStyle = black; x.font = `900 ${Math.floor(w * 0.62)}px "Arial Black", Arial, sans-serif`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('TALL', 0, 0, h * 0.8);
+      x.restore();
+    });
+    // a little clay on everything
+    for (let i = 0; i < 400; i++) { x.fillStyle = `rgba(160,90,45,${0.08 + Math.random() * 0.14})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 4 + 0.5, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#8f969c', roof: orange, rim: '#f2f2ee', helmet: '#f7f7f4', coverLeft: false,
+      number: orange, numberOutline: black, numberDisc: [yellow, black],
+    };
+  },
+};
+
 async function playerAtlas() {
   const img = await loadImg('assets/paint/raco-44-iracing-scheme.jpg');
   const c = canvas(ATLAS, ATLAS), x = c.getContext('2d');
@@ -235,8 +336,12 @@ async function playerAtlas() {
 }
 
 // number decals (like iRacing's number layer)
-function numberTexture(num, fill, outline, shadow) {
+function numberTexture(num, fill, outline, shadow, disc) {
   const c = canvas(320, 180), x = c.getContext('2d');
+  if (disc) {
+    x.fillStyle = disc[0]; x.strokeStyle = disc[1] || '#111'; x.lineWidth = 8;
+    x.beginPath(); x.ellipse(160, 90, 150, 84, 0, 0, Math.PI * 2); x.fill(); x.stroke();
+  }
   x.font = 'italic 900 140px "Arial Black", Impact, "Helvetica Neue", Arial, sans-serif';
   x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
   if (shadow) { x.lineWidth = 30; x.strokeStyle = shadow; x.strokeText(num, 166, 96, 290); }
@@ -482,7 +587,7 @@ export async function buildSprintCar(drv) {
 
   _numGeo = _numGeo || numberPlanes();
   body.add(new THREE.Mesh(_numGeo, new THREE.MeshPhongMaterial({
-    map: numberTexture(drv.number, liv.number, liv.numberOutline, liv.numberShadow), shininess: 90,
+    map: numberTexture(drv.number, liv.number, liv.numberOutline, liv.numberShadow, liv.numberDisc), shininess: 90,
     transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2,
   })));
 
