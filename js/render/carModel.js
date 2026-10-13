@@ -246,6 +246,88 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #5G Gunnar Setser: black and white. White diagonal panel on the hood sides
+  // with SETSER Fabricating, ATC on black, black tail front with sponsor stack and
+  // "In Memory of Trevor Perry", white tail back with a big black 5G, raw-steel cage
+  setser5g(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f4f4f1', black = '#121212', grey = '#9a9da1';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // hood sides: black body, white slanted panel with SETSER Fabricating, small sponsors low
+    const hoodSide = (w, h, rr) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); } // rear on the right
+      x.fillStyle = white;
+      x.beginPath(); x.moveTo(w * 0.12, h * 0.72); x.lineTo(w * 0.42, h * 0.08); x.lineTo(w * 0.98, h * 0.08); x.lineTo(w * 0.98, h * 0.72); x.fill();
+      x.fillStyle = grey; x.fillRect(w * 0.12, h * 0.72, w * 0.86, h * 0.02);
+      x.restore();
+      txt('SETSER', rr ? w * 0.62 : w * 0.38, h * 0.32, h * 0.32, black, { italic: true, stroke: white, sw: 0.06, maxW: w * 0.5 });
+      txt('Fabricating', rr ? w * 0.64 : w * 0.36, h * 0.56, h * 0.17, black, { italic: true, weight: 700, font: 'Georgia, serif', maxW: w * 0.42 });
+      const lows = [['LYNCH', 0.62], ['K&N', 0.42], ["ROB & JO'S", 0.82], ['NOS', 0.28]];
+      for (const [t, f] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.86, h * 0.09, white, { weight: 800, maxW: w * 0.18 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w, h); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w, h); });
+    // cockpit sides: black with the ATC logo
+    const cockSide = (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      txt('ATC', w * 0.5, h * 0.42, h * 0.22, white, { italic: true, maxW: w * 0.7 });
+      txt('Aviation Tax Consultants', w * 0.5, h * 0.58, h * 0.055, white, { weight: 700, maxW: w * 0.8 });
+      txt('GUNNAR SETSER', w * 0.5, h * 0.16, h * 0.06, white, { weight: 800, maxW: w * 0.7 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: black sponsor panel up front, white behind with a big black 5G
+    const tailSide = (w, h, rr) => {
+      const fx = rr ? 0 : w * 0.5;
+      x.fillStyle = black; x.fillRect(fx, 0, w * 0.5, h);
+      const cx = fx + w * 0.25;
+      txt('INDY', cx, h * 0.12, h * 0.11, white, { italic: true, maxW: w * 0.42 });
+      txt('RACE PARTS', cx, h * 0.2, h * 0.045, white, { weight: 800, maxW: w * 0.4 });
+      txt('DVY STEWART RACING', cx, h * 0.3, h * 0.045, white, { weight: 800, maxW: w * 0.44 });
+      x.strokeStyle = white; x.lineWidth = h * 0.01; x.strokeRect(fx + w * 0.08, h * 0.37, w * 0.34, h * 0.22);
+      txt('THE CURE', cx, h * 0.43, h * 0.05, white, { weight: 800, maxW: w * 0.3 });
+      txt('STARTS NOW', cx, h * 0.5, h * 0.05, white, { weight: 800, maxW: w * 0.3 });
+      txt('In Memory of', cx, h * 0.67, h * 0.05, white, { weight: 700, font: 'Arial, sans-serif', maxW: w * 0.42 });
+      txt('Trevor Perry', cx, h * 0.76, h * 0.065, white, { weight: 700, font: 'Arial, sans-serif', maxW: w * 0.44 });
+      // 5G: black block number with a thin white keyline
+      txt('5G', rr ? w * 0.66 : w * 0.46, h * 0.56, h * 0.5, black, { stroke: white, sw: 0.06, maxW: w * 0.36 });
+      x.fillStyle = black; x.fillRect(rr ? w * 0.5 : w * 0.12, h * 0.9, w * 0.38, h * 0.04);
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    // tail top: white with MTM / RH Excavating, black up front
+    P.flat(R.tailTop, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, h * 0.75, w, h * 0.25);
+      x.save(); x.translate(w * 0.5, h * 0.45); x.rotate(-Math.PI / 2);
+      txt('MTM', 0, -w * 0.12, w * 0.14, black, { maxW: h * 0.3 });
+      txt('RH EXCAVATING', 0, w * 0.1, w * 0.08, black, { maxW: h * 0.5 });
+      x.restore();
+    });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = black; x.fillRect(0, h * 0.86, w, h * 0.14); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w, h); x.fillStyle = white; x.fillRect(w * 0.55, h * 0.47, w * 0.45, h * 0.06); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = white; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('SETSER', 0, 0, w * 0.6, black, { italic: true, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 500; i++) { x.fillStyle = `rgba(110,85,60,${0.06 + Math.random() * 0.14})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#8c9095', roof: black, rim: '#dfe3e6', helmet: '#f4f4f1', coverLeft: false,
+      number: black, numberOutline: white, numberShadow: black, paintedTailNumbers: true,
+    };
+  },
+
   // #69 Brady Bacon: white car with red/blue sweeping stripes, Concord American
   // Flagpole on the hood sides, blue eagle on the tail, blue lower tail, BACON plate
   bacon69(drv) {
