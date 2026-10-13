@@ -13,7 +13,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // ---------------- settings ----------------
 const DEFAULTS = {
-  controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', pedals: 'slider', camera: 'chase', quality: 'high', volume: 0.9,
+  controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', pedals: 'slider', camera: 'chase', quality: 'high', volume: 0.9, soundMode: 'game',
   laps: 25, field: 22, difficulty: 'pro', startPos: 'random', prep: 'dialed', hotPrep: 'dialed', time: 'night',
 };
 const store = {
@@ -88,7 +88,10 @@ scene.add(dust.points);
 const input = new Input(settings);
 input.bindPedals($('pedal-gas'), $('pedal-brake'), $('steer-zone'));
 const sound = new Sound();
+sound.mode = settings.soundMode;
 sound.setVolume(settings.volume);
+// iPhone can pause web audio (calls, Siri, notifications); the next tap restarts it
+['touchend', 'click'].forEach((ev) => document.addEventListener(ev, () => sound.wake(), { passive: true }));
 
 let playerMesh = null;
 const aiMeshes = new Map(); // driver -> mesh
@@ -200,6 +203,7 @@ function initSegs() {
       b.addEventListener('click', () => {
         settings[key] = pv; saveSettings(); segRefreshers.forEach((f) => f());
         if (key === 'volume') { sound.setVolume(pv); if (pv > 0 && state !== 'menu') sound.start(); }
+        if (key === 'soundMode') sound.setMode(pv);
         if (key === 'quality') resize();
         if (key === 'prep') $('prep-desc').textContent = PREPS[pv].desc;
         if (key === 'hotPrep') refreshMenu();

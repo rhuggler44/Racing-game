@@ -1,19 +1,50 @@
 // Synthesized 410 engine + dirt/tire noise + field drone. Web Audio only.
+// A silent looping <audio> clip. On iPhones without the audioSession API (before
+// iOS 17), playing a media element is what lets Web Audio ignore the silent switch.
+function silentClip() {
+  const n = 800, b = new Uint8Array(44 + n);
+  const dv = new DataView(b.buffer);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) b[o + i] = str.charCodeAt(i); };
+  w(0, 'RIFF'); dv.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, 8000, true); dv.setUint32(28, 8000, true); dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
+  w(36, 'data'); dv.setUint32(40, n, true); b.fill(128, 44);
+  let bin = ''; b.forEach((c) => { bin += String.fromCharCode(c); });
+  const a = document.createElement('audio');
+  a.src = 'data:audio/wav;base64,' + btoa(bin); a.loop = true; a.setAttribute('playsinline', '');
+  return a;
+}
+
 export class Sound {
-  constructor() { this.ctx = null; this.vol = 0.8; }
+  // mode 'game':  plays even with the iPhone's silent switch on (pauses your music)
+  // mode 'music': mixes with Spotify / Apple Music, but the silent switch mutes it
+  constructor() { this.ctx = null; this.vol = 0.8; this.mode = 'game'; this._clip = null; }
+
+  _session() {
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = this.mode === 'music' ? 'ambient' : 'playback';
+      else if (this.mode === 'game') { this._clip = this._clip || silentClip(); const p = this._clip.play(); if (p && p.catch) p.catch(() => {}); }
+    } catch (e) { /* not supported */ }
+    if (this.mode === 'music' && this._clip) this._clip.pause();
+  }
+
+  setMode(mode) {
+    this.mode = mode;
+    if (this.ctx) { this._session(); this.ctx.resume(); }
+  }
 
   // call from a user gesture (required on iPhone)
   start() {
     // sound off: never touch the phone's audio, so your music keeps playing
     if (this.vol <= 0) return;
+    this._session();
     if (this.ctx) { this.ctx.resume(); return; }
-    try {
-      // 'ambient' mixes with other apps (Spotify, Apple Music) instead of pausing them
-      if (navigator.audioSession) navigator.audioSession.type = 'ambient';
-    } catch (e) { /* not supported */ }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = (this.ctx = new AC());
+    // iOS can leave the context 'interrupted' (calls, Siri, notifications) or
+    // 'suspended'; any later tap brings it back (see wake())
+    ctx.onstatechange = () => { if (ctx.state === 'interrupted' && !document.hidden) ctx.resume().catch(() => {}); };
     this.master = ctx.createGain();
     this.master.gain.value = this.vol;
     const comp = ctx.createDynamicsCompressor();
@@ -117,10 +148,14 @@ export class Sound {
       this.ctx.close();
       this.ctx = null;
       this.master = null;
+      if (this._clip) this._clip.pause();
+      try { if (navigator.audioSession) navigator.audioSession.type = 'auto'; } catch (e) { /* not supported */ }
     } else if (this.master) {
       this.master.gain.value = v;
     }
   }
-  suspend() { if (this.ctx) this.ctx.suspend(); }
-  resume() { if (this.ctx) this.ctx.resume(); }
+  suspend() { if (this.ctx) this.ctx.suspend(); if (this._clip) this._clip.pause(); }
+  resume() { if (this.ctx) { this._session(); this.ctx.resume(); } }
+  // from any tap: restart audio the phone paused behind our back
+  wake() { if (this.ctx && this.ctx.state !== 'running') this.resume(); }
 }

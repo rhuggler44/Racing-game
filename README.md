@@ -20,6 +20,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 - **Throttle assist** (part of Driving aids): eases the gas a little when you're spinning the tires so much you'd push up the track, or getting too sideways.
 - Hold the brake while stopped to back up.
 - **CAM:** switch between the chase cam and the in-cockpit view.
+- **Sound plays** (Settings): *Always* plays the game sound even with the iPhone's silent switch on, but pauses your music. *With my music* mixes with Spotify / Apple Music, but the silent switch mutes the game. Sound **Off** never touches your music.
 - Desktop testing: arrow keys / WASD, `C` switches camera, `P` pauses, `R` resets the car.
 
 ## What's in v1
