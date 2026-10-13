@@ -23,6 +23,7 @@ export const SPRINT_410 = {
   rpmPerMps: 172,     // direct drive: ~9000 rpm at 52 m/s
 };
 
+const EASY_GRIP = 0.9;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const tire = (al, B, C) => Math.sin(C * Math.atan(B * al));
 
@@ -291,7 +292,8 @@ export class Car {
     if (sp > this.speedLimit) aDrive = 0;
     // grip of the clay, minus what wheelspin is using up
     const muTurn = off ? Math.max(mu, 0.95) : mu;
-    const aCap = Math.sqrt(Math.max(0.1, (muTurn * G * loadMul) ** 2 - (aDrive * 0.55) ** 2));
+    // EASY_GRIP keeps a perfect Easy lap near the real track record (12.276 at Lincoln Park)
+    const aCap = Math.sqrt(Math.max(0.1, (muTurn * G * loadMul * (off ? 1 : EASY_GRIP)) ** 2 - (aDrive * 0.55) ** 2));
     this.pushing = sp * Math.abs(turn) > aCap;
     if (this.pushing && sp > 1) turn = Math.sign(turn) * aCap / sp;
     if (off) { if (sp < 1.2) turn *= sp / 1.2; } else if (sp < 3) turn *= sp / 3;
@@ -373,19 +375,27 @@ export class Car {
     // impact
     const tvx = vx - vn * nx, tvz = vz - vn * nz;
     const soft = nSign < 0 || t.zones(pr.s).kind === 'flat'; // clay berm inside, pit fence past 3-4
-    const keep = soft ? Math.max(0.7, 1 - 0.02 * vn) : Math.max(0.55, 1 - 0.035 * vn);
-    const rest = soft ? 0.1 : 0.25;
-    const nvx = tvx * keep - rest * vn * nx, nvz = tvz * keep - rest * vn * nz;
-    const c = Math.cos(this.th), s = Math.sin(this.th);
-    this.u = nvx * c + nvz * s;
-    this.v = -nvx * s + nvz * c;
-    // wall straightens the car out
+    // bounce: the car comes back off the wall (always at least a little, so it
+    // separates instead of grinding along it)
+    const rest = soft ? 0.15 : 0.32;
+    const vBack = Math.max(rest * vn, soft ? 0.6 : 1.2);
+    // scrape: friction takes speed in proportion to how hard you hit, so a
+    // brush costs a little and a big hit costs a lot
+    const vt = Math.hypot(tvx, tvz);
+    const loss = Math.min(vt, (soft ? 0.25 : 0.4) * (vn + vBack) + (vn > 8 ? (vn - 8) * 0.6 : 0));
+    const keep = vt > 1e-6 ? (vt - loss) / vt : 0;
+    const nvx = tvx * keep - vBack * nx, nvz = tvz * keep - vBack * nz;
+    // wall straightens the car out (heading only; the velocity stays as computed)
     const along = Math.atan2(tvz, tvx);
     let dth = along - this.th;
     while (dth > Math.PI) dth -= 2 * Math.PI;
     while (dth < -Math.PI) dth += 2 * Math.PI;
     if (Math.abs(dth) < Math.PI / 2) this.th += dth * 0.35;
+    const c = Math.cos(this.th), s = Math.sin(this.th);
+    this.u = nvx * c + nvz * s;
+    this.v = -nvx * s + nvz * c;
     this.w *= 0.4;
+    if (this._slide) this._slide *= 0.6; // knocks the slide out of it (Easy handling)
     this.events.push({ type: 'wall', strength: vn, outer: nSign > 0 });
     if (nSign > 0 && !soft && vn > this.flipSpeed) {
       this.flipped = true;
