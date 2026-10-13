@@ -124,7 +124,8 @@ export class Session {
     // ---- player physics (fixed substeps) ----
     let inp = this.playerStatus === 'dnf' ? { steer: 0, throttle: 0, brake: 1 } : input;
     // the computer drives the pace lap / out lap; you get the car at the green / the line
-    this.autoDriving = !car.flipped && (this.mode === 'race' ? this.phase === 'pace' : this.lapStartTime == null && !this._handedOver);
+    // and takes it back for the cool-down once you've taken the checkered flag
+    this.autoDriving = !car.flipped && (this.mode === 'race' ? this.phase === 'pace' || this.playerStatus === 'finished' : this.lapStartTime == null && !this._handedOver);
     if (this.autoDriving) inp = this._autoInput();
     const sub = 2, h = dt / sub;
     for (let i = 0; i < sub; i++) car.step(h, inp);
@@ -132,9 +133,12 @@ export class Session {
     for (const e of car.events) {
       if (e.type === 'flip') {
         const what = e.cause === 'bank' ? `OVER THE BANK IN TURN ${this.track.turnAt(car.s) || 2}!` : 'FLIPPED!';
-        if (this.mode === 'race') {
+        if (this.mode === 'race' && this.playerStatus === 'running') {
           this.playerStatus = 'dnf';
           this.message(`${what} Your night is over.`, 4, true);
+        } else if (this.mode === 'race') {
+          // after the checkers your finish already counts
+          this.message(`${what} Good thing you already took the checkers.`, 3, true);
         } else {
           this.message(what, 2.5, true);
           this._flipReset = 2.5;
@@ -158,6 +162,11 @@ export class Session {
 
   _autoInput() {
     const t = this.track, car = this.car;
+    if (this.mode === 'race' && this.playerStatus === 'finished') {
+      // cool-down: ease off and roll around down low
+      const v = Math.max(18, car.u - 6);
+      return autopilot(car, t, -t.W * 0.3, v);
+    }
     if (this.mode === 'race') {
       const slotS = this.paceLeadS - this.playerSlot.row * 8.5;
       const v = this.paceSpeed + clamp((slotS - car.S) * 0.6, -6, 6);
@@ -268,8 +277,11 @@ export class Session {
         this.phase = 'checkered';
       }
       if (this.phase === 'checkered') {
+        // once the checkers are out everyone finishes the next time by; the race
+        // wraps up when they all have, or 15 s after you took the flag
         const allDone = field.cars.every((c) => c.finished) && this.playerStatus !== 'running';
-        if (allDone || (this.playerStatus !== 'running' && this.raceTime - (this._checkeredAt ?? (this._checkeredAt = this.raceTime)) > 25)) {
+        const sinceYou = this._playerFinishAt != null ? this.raceTime - this._playerFinishAt : 0;
+        if (allDone || sinceYou > 15 || (this.playerStatus !== 'running' && this.raceTime - (this._checkeredAt ?? (this._checkeredAt = this.raceTime)) > 25)) {
           this.phase = 'done';
           this.onDone && this.onDone();
         }
@@ -278,6 +290,11 @@ export class Session {
         this._dnfTimer = (this._dnfTimer || 0) + dt;
         if (this._dnfTimer > 4) { this.phase = 'done'; this.onDone && this.onDone(); }
       }
+    }
+
+    if (this._playerFinishAt != null && !this._coolSaid && !this.car.flipped && this.raceTime - this._playerFinishAt > 4.2) {
+      this._coolSaid = true;
+      this.message('Cool-down lap: the computer has the car.', 5);
     }
 
     // ---- contact between player and AI ----
@@ -294,6 +311,7 @@ export class Session {
     this.playerStatus = 'finished';
     this._finishCount = (this._finishCount || 0) + 1;
     this.playerFinishOrder = this._finishCount;
+    this._playerFinishAt = this.raceTime;
     const pos = this.playerPosition();
     this.message(pos === 1 ? 'YOU WIN!' : `Finished P${pos}`, 4, true);
   }
