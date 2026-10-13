@@ -21,7 +21,7 @@ export const LINCOLN_PARK = {
   recordBy: 'Brady Bacon, 2018',
   aiPace: 1.15,         // Outlaw runs low 10s here, with the fast Easy-handling laps
   layout: 'lincoln',    // open turns (see zones()), clay berm around the infield
-  inner: { apron: 1.6, edge: 2.6 },
+  inner: { apron: 0.3, edge: 1.2 },  // the banked clay runs right to the infield berm
   // clay colors: tacky, dry, cushion, marbles
   clay: [[116, 72, 46], [168, 128, 92], [96, 60, 38], [150, 112, 80]],
 };
@@ -44,7 +44,7 @@ export const ELDORA = {
   bankBlend: 40,         // roll into / out of the banks over ~80 m
   recordLap: null,
   layout: 'walled',     // wall right at the edge all the way around
-  inner: { apron: 2.4, edge: 2.9, wall: true },
+  inner: { apron: 0.3, edge: 0.8, wall: true },  // the banked clay runs right to the inside wall
   grip: 0.8,   // the big, fast banks are tuned down to sane lap times
   aiPace: 1.1,   // the AI's speed profile undersells these banks; this evens it up
   clay: [[104, 86, 70], [176, 158, 134], [88, 72, 58], [150, 134, 112]],
@@ -81,13 +81,19 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
     }
     return 0;
   }
+  // the backstretch bend is one long gentle arc: turn 2 eases out into it and
+  // turn 3 eases in from it, instead of a kink in the middle of the straight
+  const kb = bend / (S + T);
   function curv(s) {
     let s0 = 0;
     for (let si = 0; si < segs.length; si++) {
       const [len, kind] = segs[si];
       if (s < s0 + len) {
         const t = (s - s0) / len;
-        if (kind === 's') return si === 4 && bend ? (bend / len) * 2 * Math.sin(Math.PI * t) ** 2 : 0;
+        if (bend && si === 3) return kMax * (1 - t) + kb * t;
+        if (bend && si === 4) return kb;
+        if (bend && si === 5) return kb * (1 - t) + kMax * t;
+        if (kind === 's') return 0;
         if (kind === 'arc') return kMax;
         if (kind === 'in') return kMax * t;
         return kMax * (1 - t);
@@ -134,6 +140,8 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   // gradually instead of all inside the turn-entry spiral.
   const tf = new Float64Array(N);
   for (let i = 0; i < N; i++) tf[i] = turnCurv(i * ds) / kMax;
+  const tk = new Float64Array(N); // curvature of the turns only (no backstretch bend)
+  for (let i = 0; i < N; i++) tk[i] = tf[i] * kMax;
   const blend = Math.round((def.bankBlend || 0) / ds);
   let bf = tf;
   for (let pass = 0; pass < 2 && blend > 0; pass++) {
@@ -166,6 +174,7 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
       const l = Math.hypot(ttx, ttz); ttx /= l; ttz /= l;
       out.tx = ttx; out.tz = ttz; out.nx = -ttz; out.nz = ttx;
       out.k = k[i] + (k[j] - k[i]) * t;
+      out.tk = tk[i] + (tk[j] - tk[i]) * t;
       out.bank = bank[i] + (bank[j] - bank[i]) * t;
       return out;
     },
@@ -180,7 +189,7 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
       const b = track.sample(s, _h).bank;
       const e = d + W / 2;
       let y;
-      if (e <= 0) y = infieldY(-e, def.inner);
+      if (e <= 0) y = infieldY(-e, def.inner, Math.tan(b));
       else if (e <= W) y = e * Math.tan(b);
       else y = track.outsideY(s, e - W);
       if (surface && e > 0 && e < W) y += surface.ridge(e / W);
@@ -265,13 +274,14 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
 }
 
 const GRIP_SCALE = 1.36;
-// inside the track: apron, then a low clay berm ringing the infield, then grass
-// (or, on a walled track, the apron runs to a concrete inside wall)
-export const APRON = 1.6, BERM_IN = 2.0, BERM_OUT = 3.2;
-function infieldY(x, inner) {
-  if (inner && inner.wall) return -Math.min(x, inner.apron) * 0.05;
-  if (x < APRON) return -x * 0.05;
-  if (x < BERM_OUT) { const t = (x - APRON) / (BERM_OUT - APRON); return -APRON * 0.05 + Math.sin(t * Math.PI) * 0.45; }
+// inside the track: no flat apron. The banked clay carries on a hair past the
+// inside edge, then a low clay berm rings the infield (grass behind it), or on
+// a walled track the concrete inside wall
+export const APRON = 0.3, BERM_IN = 0.6, BERM_OUT = 1.9;
+function infieldY(x, inner, tanB = 0) {
+  if (inner && inner.wall) return -Math.min(x, inner.apron + 0.6) * tanB;
+  if (x < APRON) return -x * tanB;
+  if (x < BERM_OUT) { const t = (x - APRON) / (BERM_OUT - APRON); return -APRON * tanB + Math.sin(t * Math.PI) * 0.45; }
   return -0.12;
 }
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);

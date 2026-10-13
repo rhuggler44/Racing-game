@@ -89,8 +89,10 @@ export class Car {
     // surface
     let mu, crr = P.Crr, bank = sm.bank, berm = 0, aOut = 0;
     const eOut = this.d - W / 2;
-    if (this.d < -W / 2 - 1.5) { mu = 0.72; crr = 0.07; bank = 0; this.surfaceKind = 'grass'; }
-    else if (this.d < -W / 2) { mu = surf.grip(0) * 0.85; crr = 0.05; bank = 0; this.surfaceKind = 'apron'; }
+    // inside the inner edge: same banked clay right down to the berm / wall
+    // (no flat apron); grass only if you get past the berm
+    if (this.d < -W / 2 - (t.innerEdge || 1.2) - 0.3) { mu = 0.72; crr = 0.07; bank = 0; this.surfaceKind = 'grass'; }
+    else if (this.d < -W / 2) { mu = surf.grip(0); this.surfaceKind = 'track'; }
     else if (eOut > 0.4) {
       // off the outside edge: grass and runoff. Only the hill in turns 1-2 pulls
       // the car away; everywhere else you can drive it back on.
@@ -277,7 +279,8 @@ export class Car {
     // Stagger only takes over in the turns. Like a real car with the wheel offset,
     // centered steering goes straight down the straightaways; the stagger builds as
     // you enter the corner and is at full strength mid-turn, the same spot every lap.
-    const cornering = this.track.kMax && !off ? clamp(sm.k / this.track.kMax, 0, 1) : 0;
+    // the turns only: Eldora's gently curved backstretch still drives like a straightaway
+    const cornering = this.track.kMax && !off ? clamp((sm.tk ?? sm.k) / this.track.kMax, 0, 1) : 0;
     let slideT = thr * 0.94 * cornering * loose                 // gas: rear steps out in the turns
       + Math.max(0, -steer) * 0.22 * cornering                   // turning in sharpens it
       - Math.max(0, steer) * 0.3;                                // countersteer catches it
