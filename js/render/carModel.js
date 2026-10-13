@@ -246,6 +246,90 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #3P Kyle Cummins: white car, giant red AVANTI over a black arrow on the hood
+  // sides, red tail front with the sponsor stack, red roof, 3P on the tail
+  cummins3p(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f6f6f3', red = '#d7192d', black = '#111111';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, weight = 900, maxW, stroke) => {
+      x.font = `italic ${weight} ${Math.floor(size)}px "Arial Black", Arial, sans-serif`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (stroke) { x.lineWidth = size * 0.16; x.strokeStyle = stroke; x.strokeText(t, px, py, maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, maxW);
+    };
+    // hood sides: black arrow pointing forward, huge AVANTI, red/black stripes low at the front
+    const hoodSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); } // shapes drawn with the rear on the right
+      x.fillStyle = black;
+      x.beginPath(); x.moveTo(w * 0.98, h * 0.3); x.lineTo(w * 0.2, h * 0.3); x.lineTo(w * 0.1, h * 0.5); x.lineTo(w * 0.2, h * 0.7); x.lineTo(w * 0.98, h * 0.7); x.fill();
+      x.fillStyle = red; x.beginPath(); x.moveTo(0, h); x.lineTo(w * 0.1, h * 0.78); x.lineTo(w * 0.3, h * 0.78); x.lineTo(w * 0.2, h); x.fill();
+      x.fillStyle = black; x.beginPath(); x.moveTo(w * 0.22, h); x.lineTo(w * 0.32, h * 0.78); x.lineTo(w * 0.38, h * 0.78); x.lineTo(w * 0.28, h); x.fill();
+      x.restore();
+      txt('AVANTI', w * 0.55, h * 0.5, h * 0.62, red, 900, w * 0.8, black);
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.fillStyle = red; x.beginPath(); x.moveTo(w * 0.4, h); x.lineTo(w * 0.7, 0); x.lineTo(w, 0); x.lineTo(w * 0.7, h); x.fill();
+      x.fillStyle = black; x.beginPath(); x.moveTo(w * 0.72, h); x.lineTo(w, h * 0.1); x.lineTo(w, h * 0.4); x.lineTo(w * 0.88, h); x.fill();
+      x.restore();
+    };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides: white with a red lower edge and a small sponsor
+    const cockSide = (w, h) => {
+      x.fillStyle = red; x.fillRect(0, h * 0.82, w, h * 0.18);
+      x.fillStyle = black; x.fillRect(0, h * 0.78, w, h * 0.04);
+      txt('Kyle Cummins', w * 0.5, h * 0.2, h * 0.09, black, 700, w * 0.8);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: red sponsor panel up front, white behind for the number
+    const tailSide = (w, h, rr) => {
+      const front = rr ? 0 : w * 0.55;
+      x.fillStyle = red; x.fillRect(front, 0, w * 0.45, h);
+      x.fillStyle = black; x.fillRect(rr ? w * 0.45 : w * 0.53, 0, w * 0.02, h);
+      const cx = front + w * 0.225;
+      x.fillStyle = white; x.fillRect(front + w * 0.03, h * 0.08, w * 0.39, h * 0.12);
+      txt('LIFESTYLE HOMES', cx, h * 0.14, h * 0.07, red, 900, w * 0.36);
+      txt('APACHE TRANSPORT', cx, h * 0.34, h * 0.09, white, 900, w * 0.4);
+      txt('LUCAS OIL CENTER', cx, h * 0.52, h * 0.085, white, 900, w * 0.4);
+      txt('NOVIX', cx, h * 0.7, h * 0.12, white, 900, w * 0.4);
+      txt('TREE STANDS', cx, h * 0.82, h * 0.06, white, 800, w * 0.4);
+      // the number lives on the back half of the tail
+      x.lineWidth = h * 0.16; x.strokeStyle = white; x.lineJoin = 'round';
+      x.font = `italic 900 ${Math.floor(h * 0.55)}px "Arial Black", Arial, sans-serif`;
+      x.strokeText('3P', rr ? w * 0.66 : w * 0.3, h * 0.48, w * 0.4);
+      txt('3P', rr ? w * 0.66 : w * 0.3, h * 0.48, h * 0.55, red, 900, w * 0.4, black);
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    // tail top: red at the front (behind the driver) with Premier Recycling
+    P.flat(R.tailTop, true, (w, h) => {
+      x.fillStyle = red; x.fillRect(0, h * 0.55, w, h * 0.45);
+      x.save(); x.translate(w / 2, h * 0.78); x.rotate(-Math.PI / 2);
+      txt('PREMIER', 0, -w * 0.08, w * 0.12, white, 900, h * 0.42);
+      txt('RECYCLING', 0, w * 0.08, w * 0.09, white, 900, h * 0.42);
+      x.restore();
+    });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = red; x.fillRect(0, h * 0.7, w, h * 0.3); });
+    // hood top: white with a red/black stripe toward the cockpit
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = red; x.fillRect(w * 0.7, h * 0.44, w * 0.3, h * 0.12); x.fillStyle = black; x.fillRect(w * 0.7, h * 0.41, w * 0.3, h * 0.03); });
+    // cage name plate
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = white; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('JUGO SUPER FOODS', 0, 0, w * 0.5, black, 900, h * 0.9);
+      x.restore();
+    });
+    for (let i = 0; i < 400; i++) { x.fillStyle = `rgba(160,90,45,${0.08 + Math.random() * 0.14})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 4 + 0.5, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: red, rim: '#dfe3e6', helmet: red, coverLeft: false,
+      number: red, numberOutline: black, numberShadow: white, paintedTailNumbers: true,
+    };
+  },
+
   // #6T Trey Osborne: white car, orange-to-yellow fade up top and on the tail,
   // red-orange sweep on the hood sides with the IHI / Industrial Hydraulics logo
   osborne6t(drv) {
@@ -352,7 +436,7 @@ function numberTexture(num, fill, outline, shadow, disc) {
   t.anisotropy = 4;
   return t;
 }
-function numberPlanes() {
+function numberPlanes(tailSides = true) {
   const parts = [];
   const mk = (w, h, pos, rot) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h));
@@ -368,8 +452,10 @@ function numberPlanes() {
   const tm = TAIL(0.42), hh = 0.62;
   const sx = lerp(tm.wb, tm.wt, hh) + 0.006, y = lerp(tm.bot, tm.top - tm.rr, hh);
   const tilt = Math.atan2(tm.wb - tm.wt, tm.top - tm.rr - tm.bot);
-  parts.push(mk(0.46, 0.26, [LEFT * sx, y, tm.z], [-tilt, Math.PI / 2, 0]));
-  parts.push(mk(0.46, 0.26, [RIGHT * sx, y, tm.z], [-tilt, -Math.PI / 2, 0]));
+  if (tailSides) {
+    parts.push(mk(0.46, 0.26, [LEFT * sx, y, tm.z], [-tilt, Math.PI / 2, 0]));
+    parts.push(mk(0.46, 0.26, [RIGHT * sx, y, tm.z], [-tilt, -Math.PI / 2, 0]));
+  }
   // top of the tail, readable from behind
   const tt = TAIL(0.5);
   parts.push(mk(0.26, 0.15, [0, tt.top + 0.004, tt.z], [-Math.PI / 2 + 0.12, Math.PI, 0]));
@@ -574,7 +660,7 @@ function wheel(R, Ri, w, side, atlasMat, coverRect) {
 }
 
 // ---------------- assemble ----------------
-let _bodyGeo, _numGeo;
+let _bodyGeo, _numGeo, _numGeoNoTail;
 export async function buildSprintCar(drv) {
   const liv = drv.isPlayer ? await playerAtlas() : aiAtlas(drv);
   const atlasMat = new THREE.MeshPhongMaterial({ map: atlasTexture(liv.canvas), side: THREE.DoubleSide, shininess: 90, specular: '#444444' });
@@ -586,7 +672,8 @@ export async function buildSprintCar(drv) {
   body.add(new THREE.Mesh(_bodyGeo, atlasMat));
 
   _numGeo = _numGeo || numberPlanes();
-  body.add(new THREE.Mesh(_numGeo, new THREE.MeshPhongMaterial({
+  _numGeoNoTail = _numGeoNoTail || numberPlanes(false);
+  body.add(new THREE.Mesh(liv.paintedTailNumbers ? _numGeoNoTail : _numGeo, new THREE.MeshPhongMaterial({
     map: numberTexture(drv.number, liv.number, liv.numberOutline, liv.numberShadow, liv.numberDisc), shininess: 90,
     transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2,
   })));
