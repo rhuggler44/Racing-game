@@ -32,6 +32,7 @@ export const PAINT_REGIONS = {
 // ---------------- helpers ----------------
 const lerp = (a, b, t) => a + (b - a) * t;
 const ease = (t) => t * t * (3 - 2 * t);
+const clamp01 = (t) => (t < 0 ? 0 : t > 1 ? 1 : t);
 const spow = (v, p) => Math.sign(v) * Math.pow(Math.abs(v), p);
 function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
 
@@ -104,7 +105,12 @@ const mirror = (pts) => pts.map(([x, y, z]) => [-x, y, z]);
 // wb/wt (half widths at bottom / at the shoulder), rr (shoulder rounding)
 const NOSE = (t) => ({ z: lerp(1.64, 1.3, t), bot: 0.4, top: lerp(0.55, 0.6, t), wb: lerp(0.18, 0.215, t), wt: lerp(0.15, 0.185, t), rr: 0.07 });
 const HOOD = (t) => ({ z: lerp(1.3, 0.1, t), bot: lerp(0.4, 0.5, t), top: 0.6 + 0.43 * ease(t), wb: lerp(0.215, 0.33, t), wt: lerp(0.185, 0.285, t), rr: lerp(0.07, 0.14, t) });
-const COCK = (t) => ({ z: lerp(0.1, -0.62, t), bot: 0.34, top: lerp(1.02, 1.1, t), wb: 0.33, wt: 0.31 });
+// cockpit sides: low up front, then the tall arm-guard panels beside the driver
+// rise toward the cage roof at the back (where the sponsor stacks go on real cars)
+const COCK = (t) => {
+  const r = ease(clamp01((t - 0.42) / 0.46));
+  return { z: lerp(0.1, -0.62, t), bot: 0.34, top: lerp(1.02, 1.06, t) + 0.5 * r, wb: 0.33, wt: lerp(0.31, 0.275, r) };
+};
 const TAIL = (t) => {
   // tall, narrow tail that rounds off at the back
   const k = t < 0.68 ? 0 : (t - 0.68) / 0.32;
@@ -1705,16 +1711,28 @@ let _tireMat;
 function tireMat() {
   if (_tireMat) return _tireMat;
   // u = around the tire, v = across the profile (sidewall -> tread -> sidewall)
-  const c = canvas(512, 128), x = c.getContext('2d');
-  x.fillStyle = '#76604f'; x.fillRect(0, 0, 512, 128);           // clay-dusted rubber
-  x.fillStyle = '#6a4f3c'; x.fillRect(0, 38, 512, 52);           // tread band
-  x.strokeStyle = 'rgba(30,22,17,0.85)'; x.lineWidth = 1.5;        // circumferential grooves
-  for (let y = 42; y < 88; y += 4.5) { x.beginPath(); x.moveTo(0, y); x.lineTo(512, y); x.stroke(); }
-  for (let i = 0; i < 900; i++) {
-    x.fillStyle = `rgba(${150 + Math.random() * 50},${90 + Math.random() * 35},${50 + Math.random() * 20},${0.1 + Math.random() * 0.25})`;
-    x.fillRect(Math.random() * 512, Math.random() * 128, 2 + Math.random() * 8, 1 + Math.random() * 3);
+  // black Hoosiers: white lettering on the sidewalls, clay packed into the tread
+  const c = canvas(1024, 128), x = c.getContext('2d');
+  x.fillStyle = '#1f1d1c'; x.fillRect(0, 0, 1024, 128);           // rubber
+  x.fillStyle = '#4b3a2e'; x.fillRect(0, 22, 1024, 84);           // tread with clay in it
+  x.strokeStyle = 'rgba(20,16,13,0.9)'; x.lineWidth = 2;           // tread blocks
+  for (let y = 26; y < 104; y += 6) { x.beginPath(); x.moveTo(0, y); x.lineTo(1024, y); x.stroke(); }
+  for (let u = 0; u < 1024; u += 9) { x.beginPath(); x.moveTo(u, 22); x.lineTo(u, 106); x.stroke(); }
+  for (let i = 0; i < 1400; i++) {
+    x.fillStyle = `rgba(${150 + Math.random() * 50},${90 + Math.random() * 35},${50 + Math.random() * 20},${0.08 + Math.random() * 0.22})`;
+    x.fillRect(Math.random() * 1024, 18 + Math.random() * 92, 2 + Math.random() * 10, 1 + Math.random() * 3);
   }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  // sidewalls: the lathe profile runs inner edge -> tread -> inner edge, so each
+  // sidewall is a thin band at the top and bottom of the texture
+  x.fillStyle = '#ecebe6'; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = 'italic 900 15px Georgia, "Times New Roman", serif';
+  for (const [y, flip] of [[9, false], [119, true]]) {
+    for (let i = 0; i < 2; i++) {
+      x.save(); x.translate(256 + i * 512, y); if (flip) x.scale(-1, -1);
+      x.scale(3.2, 1); x.fillText('Hoosier', 0, 0); x.restore();
+    }
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;
   return (_tireMat = new THREE.MeshLambertMaterial({ map: t }));
 }
 let _rimMat, _rimDark;
@@ -1774,6 +1792,7 @@ function rimMatFor(color) {
 function wheel(R, Ri, w, side, atlasMat, coverRect, rimColor) {
   const g = new THREE.Group();
   const tire = new THREE.Mesh(tireGeo(R, Ri, w), tireMat());
+  if (side === LEFT) tire.rotation.y = Math.PI; // so the Hoosier lettering reads right on both sides
   g.add(tire);
   let [rimM, darkM] = rimMats();
   if (rimColor) rimM = rimMatFor(rimColor); // painted / black wheels

@@ -12,6 +12,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 ### Handling
 - **Easy (default):** you drive it with the gas. Turn in, then get on the throttle: the stagger and wheelspin kick the rear out and the car slides left around the corner. Steer right to catch or hold the slide, and lift to straighten it up. Too much speed or gas and you push up the track toward the cushion, or over the bank in 1-2.
 - **Realistic:** the full tire-physics model (Settings → Handling).
+- **Going off the track:** in the infield grass or the runoff, the car stops sliding and goes where you point it, so you can steer it back on. The hill in turns 1-2 still pulls you over if you don't catch it quickly. Stuck off the track for a few seconds? Tap **Back to track**.
 
 ### Controls
 - **Steer:** tilt the phone like a steering wheel. Re-center from the pause menu if it drifts.
@@ -30,7 +31,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
   - *Dry Slick:* throttle control wins.
 - **Lincoln Park layout, modeled on photos of the track:** a wall on the front stretch only, no wall in turns 1-2 (jump the cushion and you go over the bank), a backstretch wall set back off the track, flat runoff out to the pits in turns 3-4, and a clay berm ringing the infield. Night or day.
 - Your **#44 RACO Marketing** car. The iRacing paint file (`assets/paint/raco-44-iracing-scheme.jpg`) is mapped panel by panel onto the car (see `PAINT_REGIONS` in `js/render/carModel.js`), with a gold chassis and cage, painted left-side mud covers and the HUGGLER name plate.
-- Placeholder drivers in `js/drivers.js`. Edit names, numbers and colors there.
+- Real Indiana drivers' cars (painted from photos) plus a few placeholder drivers, in `js/drivers.js`. Liveries are in `CUSTOM_LIVERIES` in `js/render/carModel.js`.
 
 ## Project layout
 | Path | What it does |
@@ -41,7 +42,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 | `js/session.js` | Hot laps and race flow: pace lap, flags, positions, contact |
 | `js/render/` | three.js track scene, car model/livery, dust and roost |
 | `js/input.js`, `js/audio.js` | Tilt/touch controls, synthesized 410 engine sound |
-| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs`) |
+| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs`, `node tools/rejoin-test.mjs` for getting back on the track) |
 
 ## Hosting with GitHub Pages
 In the repo, go to **Settings → Pages**. Under *Build and deployment*, set *Source* to **Deploy from a branch**,
