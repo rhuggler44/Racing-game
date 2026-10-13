@@ -18,7 +18,34 @@ export const LINCOLN_PARK = {
   bankTurn: 12 * DEG,
   bankStraight: 4 * DEG,
   recordLap: 12.276,
+  recordBy: 'Brady Bacon, 2018',
+  layout: 'lincoln',    // open turns (see zones()), clay berm around the infield
+  inner: { apron: 1.6, edge: 2.6 },
+  // clay colors: tacky, dry, cushion, marbles
+  clay: [[116, 72, 46], [168, 128, 92], [96, 60, 38], [150, 112, 80]],
 };
+
+// Eldora Speedway, Rossburg OH: the high-banked 1/2-mile clay oval. Laid out from
+// Ryan's in-car video: concrete wall with a catch fence all the way around, an
+// inside wall with yellow pads, wide turns, gray-brown clay.
+export const ELDORA = {
+  id: 'eldora',
+  name: 'Eldora Speedway',
+  location: 'Rossburg, Ohio',
+  lengthLabel: '1/2 mile',
+  length: 804.67,
+  straight: 150,
+  ramp: 40,
+  width: 20,
+  bankTurn: 20 * DEG,
+  bankStraight: 6 * DEG,
+  recordLap: null,
+  layout: 'walled',     // wall right at the edge all the way around
+  inner: { apron: 2.4, edge: 2.9, wall: true },
+  clay: [[104, 86, 70], [176, 158, 134], [88, 72, 58], [150, 134, 112]],
+};
+
+export const TRACKS = { [LINCOLN_PARK.id]: LINCOLN_PARK, [ELDORA.id]: ELDORA };
 
 export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   const L = def.length, S = def.straight, T = def.ramp;
@@ -86,6 +113,7 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   const W = def.width;
   const track = {
     def, L, N, ds, W, kMax, x, z, tx, tz, nx, nz, k, bank, turnZones,
+    innerEdge: def.inner.edge, // how far inside the inner edge the berm / inside wall stops a car
     wrap(s) { s %= L; return s < 0 ? s + L : s; },
     // interpolated sample at arc length s
     sample(s, out = {}) {
@@ -111,7 +139,7 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
       const b = track.sample(s, _h).bank;
       const e = d + W / 2;
       let y;
-      if (e <= 0) y = infieldY(-e);
+      if (e <= 0) y = infieldY(-e, def.inner);
       else if (e <= W) y = e * Math.tan(b);
       else y = track.outsideY(s, e - W);
       if (surface && e > 0 && e < W) y += surface.ridge(e / W);
@@ -123,6 +151,7 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
     //  backstretch:   wall set well back with a short drop down to it
     //  turns 3-4:     no wall, flatter runoff where cars come on from the pits
     zones(s, out = _z) {
+      if (def.layout === 'walled') { out.front = 1; out.drop = out.back = out.flat = 0; out.kind = 'front'; return out; }
       s = track.wrap(s);
       const f = (a, b, x) => clamp((x - a) / (b - a), 0, 1);
       // front <-> drop around turn 1 entry, drop <-> back at turn 2 exit,
@@ -196,8 +225,10 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
 
 const GRIP_SCALE = 1.36;
 // inside the track: apron, then a low clay berm ringing the infield, then grass
+// (or, on a walled track, the apron runs to a concrete inside wall)
 export const APRON = 1.6, BERM_IN = 2.0, BERM_OUT = 3.2;
-function infieldY(x) {
+function infieldY(x, inner) {
+  if (inner && inner.wall) return -Math.min(x, inner.apron) * 0.05;
   if (x < APRON) return -x * 0.05;
   if (x < BERM_OUT) { const t = (x - APRON) / (BERM_OUT - APRON); return -APRON * 0.05 + Math.sin(t * Math.PI) * 0.45; }
   return -0.12;

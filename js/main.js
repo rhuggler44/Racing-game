@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildTrack, Surface, PREPS, LINCOLN_PARK } from './track.js';
+import { buildTrack, Surface, PREPS, TRACKS, LINCOLN_PARK } from './track.js';
 import { Session } from './session.js';
 import { DRIVERS, PLAYER } from './drivers.js';
 import { Input } from './input.js';
@@ -14,7 +14,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 // ---------------- settings ----------------
 const DEFAULTS = {
   controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', pedals: 'slider', camera: 'chase', quality: 'high', volume: 0.9, soundMode: 'game',
-  laps: 25, field: 22, difficulty: 'pro', startPos: 'random', prep: 'dialed', hotPrep: 'dialed', time: 'night',
+  laps: 25, field: 22, difficulty: 'pro', track: 'lincoln-park', startPos: 'random', prep: 'dialed', hotPrep: 'dialed', time: 'night',
 };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -77,7 +77,18 @@ function resize() {
 }
 
 // ---------------- world ----------------
-const track = buildTrack(LINCOLN_PARK);
+const TRACK_DEF = TRACKS[settings.track] || LINCOLN_PARK;
+const track = buildTrack(TRACK_DEF);
+// best laps are saved per track (Lincoln Park keeps its original keys)
+const bestKey = (prep) => (TRACK_DEF.id === 'lincoln-park' ? `lps.best.${prep}` : `${TRACK_DEF.id}.best.${prep}`);
+const recordText = TRACK_DEF.recordLap ? `Track record ${TRACK_DEF.recordLap.toFixed(3)}s` : '';
+{
+  // menu / loading text for the chosen track
+  const [first, ...rest] = TRACK_DEF.name.split(' ');
+  document.querySelector('#menu h1').innerHTML = `${first}${rest.length ? ' ' + rest.slice(0, -1).join(' ') : ''}<br>${rest.slice(-1)[0] || ''}`;
+  document.querySelector('#menu .sub').textContent = `${TRACK_DEF.location} · ${TRACK_DEF.lengthLabel} clay oval`;
+  $('loading-title').textContent = `Loading ${TRACK_DEF.name}…`;
+}
 const surface = new Surface(track, settings.prep);
 const trackScene = new TrackScene(track, surface, settings.quality);
 scene.add(trackScene.group);
@@ -140,11 +151,11 @@ async function startSession(mode) {
     track, surface, mode, laps: settings.laps, fieldSize: settings.field, difficulty: settings.difficulty,
     startPos: settings.startPos, drivers: DRIVERS, player: PLAYER, assists: settings.assists, handling: settings.handling,
   });
-  if (!isRace) session.bestLap = store.get(`lps.best.${prep}`, Infinity) || Infinity;
+  if (!isRace) session.bestLap = store.get(bestKey(prep), Infinity) || Infinity;
   session.hotPrep = prep;
   session.onLap = (lt, pb) => {
     sound.beep(pb ? 1320 : 990, 0.12);
-    if (pb) store.set(`lps.best.${prep}`, lt);
+    if (pb) store.set(bestKey(prep), lt);
   };
   session.onGreen = () => { sound.beep(1200, 0.4); input.recenter(); };
   session.onHandover = () => { sound.beep(1200, 0.3); input.recenter(); };
@@ -183,8 +194,9 @@ function hideAll() { screens.forEach((s) => $(s).classList.add('hidden')); }
 function show(id) { hideAll(); $(id).classList.remove('hidden'); if (id === 'menu') refreshMenu(); }
 
 function refreshMenu() {
-  const b = store.get(`lps.best.${settings.hotPrep}`, null);
-  $('menu-best').textContent = b ? `Your best hot lap (${PREPS[settings.hotPrep].label}): ${b.toFixed(3)}s · Track record 12.276s` : 'Track record: 12.276s (Brady Bacon, 2018)';
+  const b = store.get(bestKey(settings.hotPrep), null);
+  const rec = TRACK_DEF.recordLap ? `Track record: ${TRACK_DEF.recordLap.toFixed(3)}s (${TRACK_DEF.recordBy})` : '';
+  $('menu-best').textContent = b ? `Your best hot lap (${PREPS[settings.hotPrep].label}): ${b.toFixed(3)}s${recordText ? ' · ' + recordText : ''}` : rec;
 }
 
 const segRefreshers = [];
@@ -207,6 +219,7 @@ function initSegs() {
         if (key === 'quality') resize();
         if (key === 'prep') $('prep-desc').textContent = PREPS[pv].desc;
         if (key === 'hotPrep') refreshMenu();
+        if (key === 'track') { $('loading-title').textContent = 'Loading track…'; show('loading'); setTimeout(() => location.reload(), 50); }
         if (key === 'time') applyTime();
       });
       seg.appendChild(b);
@@ -392,7 +405,7 @@ function updateHud(dt) {
     $('hud-pos').innerHTML = 'HOT LAPS';
     $('hud-lap').textContent = `Laps ${s.playerLaps.length}`;
     $('hud-time').textContent = s.lapStartTime != null ? (s.time - s.lapStartTime).toFixed(2) : 'out lap';
-    $('hud-best').textContent = `Last ${fmt(s.lastLap)} · Best ${fmt(s.bestLap)} · Record 12.276`;
+    $('hud-best').textContent = `Last ${fmt(s.lastLap)} · Best ${fmt(s.bestLap)}${TRACK_DEF.recordLap ? ' · Record ' + TRACK_DEF.recordLap.toFixed(3) : ''}`;
     $('hud-flag').className = 'flag green';
     trackScene.setFlag('green');
   }

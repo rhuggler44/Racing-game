@@ -1,9 +1,15 @@
-// Lincoln Park Speedway environment, modeled on photos of the track:
+// Track environments.
+// Lincoln Park Speedway, modeled on photos of the track:
 //  - orange/red clay, light clay berm ringing a grass infield, infield light poles
 //  - front stretch: low concrete wall, grass bank, wooden bleachers, big white building
 //  - turns 1-2: no wall, the track drops off down a hill
 //  - backstretch: wall set back off the track with a drop down to it
 //  - turns 3-4: no wall, flatter runoff out to the pits
+// Eldora Speedway (layout 'walled'), from Ryan's in-car video:
+//  - concrete wall + tall catch fence all the way around, painted with lettering,
+//    billboards along the fence in the turns
+//  - inside concrete wall with yellow pads, grass infield
+//  - big grandstands down the front stretch and backstretch, tower out of turn 4
 import * as THREE from 'three';
 import { APRON, BERM_OUT } from '../track.js';
 
@@ -18,6 +24,7 @@ export class TrackScene {
     this.NS = 480;
     this.M = 34;
     this.nightOnly = [];
+    this.walled = track.def.layout === 'walled';
     this._buildSky();
     this._buildSurface();
     this._buildInside();
@@ -145,7 +152,7 @@ export class TrackScene {
     const r = rng(3);
     // Indiana red clay: dark and red when tacky, orange-tan as it dries out
     // Lincoln Park clay: brown and a little red when tacky, tan as it dries out (from in-car video)
-    const tacky = [116, 72, 46], dry = [168, 128, 92], cushion = [96, 60, 38], marbles = [150, 112, 80];
+    const [tacky, dry, cushion, marbles] = t.def.clay;
     const rows = [];
     for (let j = 0; j < h; j++) {
       const dn = (j + 0.5) / h;
@@ -185,6 +192,7 @@ export class TrackScene {
 
   // ---------------- apron, infield berm, infield ----------------
   _buildInside() {
+    if (this.walled) return this._buildInsideWalled();
     const t = this.track, W = t.W;
     const ds = [-W / 2, -W / 2 - APRON * 0.5, -W / 2 - APRON, -W / 2 - APRON - 0.4, -W / 2 - (APRON + BERM_OUT) / 2, -W / 2 - BERM_OUT + 0.3, -W / 2 - BERM_OUT, -W / 2 - BERM_OUT - 2];
     const apron = new THREE.Color('#7a4426'), berm = new THREE.Color('#c99a68'), grass = new THREE.Color('#3f6a2c');
@@ -203,6 +211,47 @@ export class TrackScene {
     const inf = new THREE.Mesh(ig, new THREE.MeshLambertMaterial({ color: '#3f6a2c' }));
     inf.position.y = -0.13;
     this.group.add(inf);
+  }
+
+  // walled track: the apron runs to a concrete inside wall with yellow pads at
+  // the ends of the straights; grass infield behind it
+  _buildInsideWalled() {
+    const t = this.track, W = t.W, edge = t.innerEdge, apronW = t.def.inner.apron;
+    const ds = [-W / 2, -W / 2 - apronW * 0.5, -W / 2 - apronW, -W / 2 - edge, -W / 2 - edge - 3];
+    const clay = new THREE.Color().setRGB(...t.def.clay[0].map((v) => (v * 0.85) / 255)).convertSRGBToLinear();
+    const grass = new THREE.Color('#3f6a2c');
+    const g = this._ribbon(ds, (s, d, j, c) => { if (j <= 3) c.copy(clay); else c.copy(grass); });
+    this.group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
+    const shape = new THREE.Shape(), p = {};
+    for (let i = 0; i < this.NS; i++) {
+      t.pos((i / this.NS) * t.L, -W / 2 - edge - 2.5, p);
+      if (i === 0) shape.moveTo(p.x, -p.z); else shape.lineTo(p.x, -p.z);
+    }
+    const ig = new THREE.ShapeGeometry(shape, 1);
+    ig.rotateX(-Math.PI / 2);
+    const inf = new THREE.Mesh(ig, new THREE.MeshLambertMaterial({ color: '#3f6a2c' }));
+    inf.position.y = -0.14;
+    this.group.add(inf);
+    // the inside wall: a low concrete band, yellow pads where it starts and ends
+    const zs = t.turnZones, pads = [];
+    for (const zi of [1, 3, 5, 7]) { const s0 = zi % 2 ? zs[zi].s0 : zs[zi].s1; pads.push(s0); }
+    const n = this.NS, pos = [], col = [], idx = [], q = {}, cc = new THREE.Color();
+    const white = new THREE.Color('#cfcbc2'), yellow = new THREE.Color('#f2c200');
+    for (let i = 0; i <= n; i++) {
+      const s = (t.L * i) / n;
+      const padded = pads.some((ps) => Math.abs(((s - ps + t.L * 1.5) % t.L) - t.L / 2) < 9);
+      cc.copy(padded ? yellow : white);
+      for (const [dd, y] of [[0, -0.2], [0, 0.85], [-0.35, 0.85], [-0.35, -0.2]]) {
+        t.pos(s, -W / 2 - edge + dd, q);
+        pos.push(q.x, t.height(s, -W / 2 - edge) + y, q.z); col.push(cc.r, cc.g, cc.b);
+      }
+      if (i < n) for (let k = 0; k < 3; k++) { const a = i * 4 + k, b = a + 4; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    }
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    wg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    wg.setIndex(idx); wg.computeVertexNormals();
+    this.group.add(new THREE.Mesh(wg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
   }
 
   // ---------------- terrain outside the track ----------------
@@ -227,7 +276,12 @@ export class TrackScene {
   _adTexture() {
     if (this._ads) return this._ads;
     const ads = canvas(2048, 128), x = ads.getContext('2d');
-    const boards = [
+    const boards = this.walled ? [
+      ['ELDORA', '#f4f2ec', '#d0102a'],
+      ['RACO MARKETING', '#0b0b0e', '#f2cf7e'],
+      ['THE BIG E', '#f4f2ec', '#0b2e6e'],
+      ['ROSSBURG, OHIO', '#f4f2ec', '#d0102a'],
+    ] : [
       ['LINCOLN PARK SPEEDWAY', '#c8102e', '#fff'],
       ['RACO MARKETING', '#0b0b0e', '#f2cf7e'],
       ['PUTNAMVILLE, INDIANA', '#0033a0', '#fff'],
@@ -311,15 +365,148 @@ export class TrackScene {
     }
   }
 
+  // colorful sponsor billboards mounted along the catch fence (Eldora's turns)
+  _billboards(s0, s1, e, y0, h) {
+    const t = this.track, W = t.W;
+    if (!this._bbTex) {
+      const c = canvas(2048, 128), x = c.getContext('2d');
+      const boards = [['ELDORA', '#d0102a', '#fff'], ['USAC', '#0b2e6e', '#fff'], ['RACO', '#0b0b0e', '#f2cf7e'], ['HOOSIER', '#f5f5f5', '#111'],
+        ['LONG', '#e8e8e8', '#c8102e'], ['KEIZER', '#111', '#fff'], ['FLORACING', '#e4002b', '#fff'], ['SUNOCO', '#ffd100', '#0033a0']];
+      boards.forEach(([txt, bg, fg], i) => {
+        x.fillStyle = bg; x.fillRect(i * 256 + 4, 6, 248, 116);
+        x.fillStyle = fg; x.font = 'italic 900 50px "Arial Black", Arial, sans-serif';
+        x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, i * 256 + 128, 66, 230);
+      });
+      this._bbTex = new THREE.CanvasTexture(c);
+      this._bbTex.colorSpace = THREE.SRGBColorSpace; this._bbTex.wrapS = THREE.RepeatWrapping; this._bbTex.anisotropy = 4;
+    }
+    const n = Math.max(4, Math.round(((s1 - s0) / t.L) * this.NS));
+    const pos = [], uv = [], idx = [], p = {};
+    for (let i = 0; i <= n; i++) {
+      const s = s0 + ((s1 - s0) * i) / n;
+      const base = t.height(s, W / 2 + e);
+      t.pos(s, W / 2 + e + 0.05, p);
+      pos.push(p.x, base + y0, p.z, p.x, base + y0 + h, p.z);
+      const u = -((s - s0) / 48);
+      uv.push(u, 0, u, 1);
+      if (i < n) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    this.group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ map: this._bbTex, side: THREE.DoubleSide })));
+  }
+
   _buildWalls() {
     const L = this.track.L;
+    if (this.walled) {
+      this._wall(0, L, 0.3, 1.3, 4.6, true); // wall + catch fence all the way around
+      for (const [a, b] of [[1, 3], [5, 7]]) {
+        const zs = this.track.turnZones;
+        this._billboards(zs[a].s0 + 6, zs[b].s1 - 6, 0.3, 3.0, 1.5);
+      }
+      return;
+    }
     this._wall(L - 52, L + 52, 0.3, 1.0, 3.2, true); // front stretch, right at the edge
     this._wall(206, 296, 9, 1.1, 2.0, true);         // backstretch, set well back
     this._wall(304, 440, 26, 0.6, 1.4, false);       // pit-side fence past the 3-4 runoff
   }
 
   // ---------------- front stretch: grass bank, wooden bleachers, white building ----------------
+  // a big concrete grandstand along the track, centered at sMid, e0 meters past
+  // the outer edge, built in a local frame (x along the track, z outward)
+  _grandstand(sMid, len, rows, e0, opts = {}) {
+    const t = this.track, W = t.W;
+    const g = new THREE.Group();
+    const rise = opts.rise || 0.5, depth = opts.depth || 0.85;
+    const concrete = new THREE.MeshLambertMaterial({ color: opts.color || '#9a958c' });
+    const seat = new THREE.MeshLambertMaterial({ color: opts.seat || '#b0362f' });
+    const crowdMat = new THREE.MeshLambertMaterial({ map: this._crowdTex(len), transparent: true, alphaTest: 0.2 });
+    const y0 = t.outsideY(sMid, e0) + (opts.lift || 0);
+    for (let i = 0; i < rows; i++) {
+      const z = e0 + i * depth, y = y0 + 0.4 + i * rise;
+      const step = new THREE.Mesh(new THREE.BoxGeometry(len, rise, depth), concrete);
+      step.position.set(0, y - rise / 2, z + depth / 2);
+      g.add(step);
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(len - 2, 0.12, 0.3), seat);
+      bench.position.set(0, y + 0.3, z + depth * 0.6);
+      g.add(bench);
+      if ((i * 7) % 10 < 8) {
+        const people = new THREE.Mesh(new THREE.PlaneGeometry(len - 3, 0.75), crowdMat);
+        people.position.set(0, y + 0.62, z + depth * 0.65);
+        people.rotation.y = Math.PI;
+        g.add(people);
+      }
+    }
+    // back wall + underside so it reads as a solid structure from the track
+    const H = 0.4 + rows * rise;
+    const back = new THREE.Mesh(new THREE.BoxGeometry(len, H + 2, 0.4), concrete);
+    back.position.set(0, y0 + H / 2, e0 + rows * depth + 0.2);
+    g.add(back);
+    if (opts.roof) {
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(len, 0.3, rows * depth * 0.6), new THREE.MeshLambertMaterial({ color: '#d8d4cc' }));
+      roof.position.set(0, y0 + H + 4, e0 + rows * depth * 0.7);
+      g.add(roof);
+      for (let i = 0; i <= 6; i++) {
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.2, 0.3), concrete);
+        col.position.set(-len / 2 + (i * len) / 6, y0 + H + 2, e0 + rows * depth);
+        g.add(col);
+      }
+    }
+    const sm = t.pos(sMid, W / 2, {});
+    g.position.set(sm.x, 0, sm.z);
+    g.rotation.y = Math.atan2(-sm.tz, sm.tx);
+    this.group.add(g);
+    return { g, y0, H, back: e0 + rows * depth };
+  }
+
+  _crowdTex(len) {
+    const r = rng(11);
+    const cc = canvas(512, 32), cx = cc.getContext('2d');
+    const shirt = ['#c8102e', '#f5f5f5', '#0033a0', '#ffd100', '#222', '#ff6a13', '#2e7d32', '#999', '#6a1b9a', '#f2cf7e'];
+    for (let i = 0; i < 150; i++) {
+      if (r() < 0.3) continue;
+      const x = i * 3.4 + r() * 1.5;
+      cx.fillStyle = shirt[Math.floor(r() * shirt.length)];
+      cx.fillRect(x, 13 + r() * 4, 2.4, 14);
+      cx.fillStyle = ['#f1c27d', '#c68642', '#8d5524', '#e0ac69'][Math.floor(r() * 4)];
+      cx.fillRect(x + 0.3, 7 + r() * 4, 1.8, 6);
+    }
+    const crowd = new THREE.CanvasTexture(cc);
+    crowd.colorSpace = THREE.SRGBColorSpace;
+    crowd.wrapS = THREE.RepeatWrapping; crowd.repeat.set(len / 12, 1);
+    return crowd;
+  }
+
+  // Eldora: huge grandstands down the front stretch and the backstretch, the
+  // press box on top of the front stands, and the tower out of turn 4
+  _buildStandsWalled() {
+    const t = this.track, S = t.def.straight;
+    const front = this._grandstand(0, S * 0.95, 34, 2.2, { rise: 0.52, depth: 0.82, roof: false });
+    const pb = new THREE.Mesh(new THREE.BoxGeometry(60, 5, 7), new THREE.MeshLambertMaterial({ color: '#e7e3da' }));
+    pb.position.set(0, front.y0 + front.H + 2.5, front.back - 3.5);
+    front.g.add(pb);
+    this.windowMat = new THREE.MeshBasicMaterial({ color: '#ffe7a6' });
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(56, 2.6), this.windowMat);
+    glass.position.set(0, front.y0 + front.H + 2.7, front.back - 7.02);
+    glass.rotation.y = Math.PI;
+    front.g.add(glass);
+    this._grandstand(t.L / 2, S * 0.85, 24, 2.2, { rise: 0.5, depth: 0.82, seat: '#2f4f8f' });
+    // the tower building outside turn 4
+    const zs = t.turnZones;
+    const s4 = zs[7].s0 + 10, p = t.pos(s4, t.W / 2 + 22, {});
+    const tower = new THREE.Group();
+    const tb = new THREE.Mesh(new THREE.BoxGeometry(12, 22, 12), new THREE.MeshLambertMaterial({ color: '#d9d5cc' }));
+    tb.position.y = 11; tower.add(tb);
+    const tg = new THREE.Mesh(new THREE.BoxGeometry(12.2, 3, 12.2), new THREE.MeshLambertMaterial({ color: '#2c7a4b' }));
+    tg.position.y = 19; tower.add(tg);
+    tower.position.set(p.x, t.outsideY(s4, 22) - 1, p.z);
+    this.group.add(tower);
+  }
+
   _buildStands() {
+    if (this.walled) return this._buildStandsWalled();
     const t = this.track, W = t.W;
     const g = new THREE.Group();
     const sm = t.sample(0, {});
@@ -383,14 +570,17 @@ export class TrackScene {
   _buildLights() {
     const t = this.track, W = t.W;
     const poles = [], p = {};
-    for (const s of [20, 75, 130, 185, 230, 270, 330, 390, 440, 485]) {
+    const spots = this.walled
+      ? t.turnZones.filter((z) => z.kind !== 's').flatMap((z) => [z.s0 + (z.s1 - z.s0) * 0.3, z.s0 + (z.s1 - z.s0) * 0.8])
+      : [20, 75, 130, 185, 230, 270, 330, 390, 440, 485];
+    for (const s of spots) {
       const k = t.zones(s).kind;
-      const e = k === 'front' ? 3.5 : k === 'back' ? 10.5 : 7;
+      const e = this.walled ? 8 : k === 'front' ? 3.5 : k === 'back' ? 10.5 : 7;
       t.pos(s, W / 2 + e, p);
       poles.push([p.x, p.z, t.height(s, W / 2 + e)]);
     }
     for (const s of [t.L * 0.12, t.L * 0.38, t.L * 0.62, t.L * 0.88]) {
-      t.pos(s, -W / 2 - 16, p);
+      t.pos(s, -W / 2 - (this.walled ? 22 : 16), p);
       poles.push([p.x, p.z, -0.13]);
     }
     const poleGeo = new THREE.CylinderGeometry(0.17, 0.26, 24, 6);
@@ -424,9 +614,12 @@ export class TrackScene {
     const n = 30;
     const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: '#ffffff' }), n);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), p = {};
+    // Lincoln: beyond the turn 3-4 runoff. Eldora: behind the wall out of turn 2.
+    const zs = t.turnZones;
+    const sStart = this.walled ? zs[2].s0 : 312, step = this.walled ? (zs[3].s1 - zs[2].s0) / 15 : 8.6;
     for (let i = 0; i < n; i++) {
-      const s = 312 + (i % 15) * 8.6;
-      const e = 32 + Math.floor(i / 15) * 14 + r() * 3;
+      const s = sStart + (i % 15) * step;
+      const e = (this.walled ? 26 : 32) + Math.floor(i / 15) * 14 + r() * 3;
       t.pos(s, W / 2 + e, p);
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.atan2(p.tz, p.tx) + Math.PI / 2 + (r() - 0.5) * 0.25);
       m4.compose(new THREE.Vector3(p.x, t.height(s, W / 2 + e) + 1.9, p.z), q, new THREE.Vector3(2.5, 3.8, 8 + r() * 6));
@@ -449,7 +642,7 @@ export class TrackScene {
     const r = rng(5), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color();
     for (let i = 0; i < n; i++) {
       const a = r() * Math.PI * 2;
-      const rad = 190 + r() * 110 + (r() < 0.3 ? 60 : 0);
+      const rad = (190 + r() * 110 + (r() < 0.3 ? 60 : 0)) * Math.max(1, Math.sqrt(this.track.L / 503));
       const sc = 0.9 + r() * 1.1;
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), r() * 6);
       m4.compose(new THREE.Vector3(Math.cos(a) * rad * 1.15, -2.55, Math.sin(a) * rad), q, new THREE.Vector3(sc * (1 + r() * 0.5), sc * (0.9 + r() * 0.5), sc * (1 + r() * 0.5)));
@@ -461,6 +654,7 @@ export class TrackScene {
 
   // big white tires lying on the inside edge of the turns (turn markers)
   _buildTireMarkers() {
+    if (this.walled) return; // Eldora has the inside wall instead
     const t = this.track, W = t.W;
     const geo = new THREE.TorusGeometry(0.62, 0.3, 10, 18);
     const mat = new THREE.MeshLambertMaterial({ color: '#e8e6df' });

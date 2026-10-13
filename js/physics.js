@@ -128,7 +128,7 @@ export class Car {
 
     // vertical load: banking adds load when turning into it
     const turnIn = u > 0 && w < 0 ? -u * w : 0;
-    const loadMul = clamp(Math.cos(bank) + turnIn * Math.sin(bank) / G, 0.6, 1.8);
+    const loadMul = clamp(Math.cos(bank) + turnIn * Math.sin(bank) / G, 0.6, 2.8); // high banks (Eldora) press the tires down hard
     const Fz = m * G * loadMul;
     const Fzf = clamp(Fz * P.b / WB - m * this.ax * P.h / WB, Fz * 0.15, Fz * 0.85);
     const Fzr = Fz - Fzf;
@@ -136,7 +136,8 @@ export class Car {
     // steering (slightly less lock at speed), stagger pulls left
     let delta = clamp(inp.steer, -1, 1) * P.maxSteer / (1 + Math.max(u, 0) / 70);
     if (this.assists && u > 4) delta += clamp(0.5 * beta, -0.22, 0.22); // countersteer help
-    delta -= P.stagger;
+    // the stagger pulls hardest on the gas; off the gas / braking it mostly lets go
+    delta -= P.stagger * (0.35 + 0.65 * clamp(inp.throttle, 0, 1));
     delta = clamp(delta, -P.maxSteer, P.maxSteer);
     // steering rack has finite speed
     const maxRate = 4.0 * dt;
@@ -159,7 +160,9 @@ export class Car {
     let Frev = 0;
     if (brk > 0.3 && thr < 0.05 && u < 0.6) Frev = -2200 * brk;
 
-    let Fxr = Fd - Fbrake * 0.55 * sgnU + (u < 0.6 ? Frev : 0);
+    // rear brakes can only use part of the rear grip, so hard braking from big
+    // speed (Eldora's straights) doesn't lock the rears and swap ends
+    let Fxr = Fd - Math.min(Fbrake * 0.55, Crear * 0.45) * sgnU + (u < 0.6 ? Frev : 0);
     let spin = 0;
     if (Math.abs(Fxr) > Crear) {
       spin = Math.abs(Fxr) / Crear - 1;
@@ -167,8 +170,10 @@ export class Car {
     }
     const latFrac = Math.max(Math.sqrt(Math.max(0, 1 - (Fxr / Crear) ** 2)), this.assists ? 0.6 : 0.45);
     const Fyr = -Crear * latFrac * tire(ar, P.tireB, P.tireC);
-    const Fyf = -mu * Fzf * tire(af, P.tireB, P.tireC);
-    const Fxf = -Fbrake * 0.45 * sgnU;
+    // front tires share their grip between braking and turning too
+    const Cfront = mu * Fzf;
+    const Fxf = -Math.min(Fbrake * 0.45, Cfront * 0.9) * sgnU;
+    const Fyf = -Cfront * Math.sqrt(Math.max(0, 1 - (Fxf / Cfront) ** 2)) * tire(af, P.tireB, P.tireC);
 
     const drag = 0.5 * 1.2 * P.CdA * u * Math.abs(u);
     const roll = crr * m * G * sgnU;
@@ -281,7 +286,7 @@ export class Car {
     const steerRate = steer * (off ? 1.1 + 0.7 * clamp(1 - sp / 25, 0, 1) : 0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
     let turn = steerRate - slide * 1.85 - 0.06 * sf * cornering;   // + right, - left (stagger pulls left in turns)
     if (fwd < 0) turn = -steer * 0.8;
-    const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 1.8);
+    const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 2.8); // high banks (Eldora) press the tires down hard
     let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));
     if (sp > this.speedLimit) aDrive = 0;
     // grip of the clay, minus what wheelspin is using up
@@ -356,7 +361,7 @@ export class Car {
     const psi = this.th - Math.atan2(tsm.tz, tsm.tx);
     const ext = P.halfWidth * Math.abs(Math.cos(psi)) + P.halfLength * Math.abs(Math.sin(psi));
     // outer wall depends on the section of track; inside is the infield berm
-    const outer = W / 2 + t.wallE(pr.s), inner = -W / 2 - 2.6;
+    const outer = W / 2 + t.wallE(pr.s), inner = -W / 2 - (t.innerEdge || 2.6);
     let pen = 0, nSign = 0;
     if (pr.d + ext > outer) { pen = pr.d + ext - outer; nSign = 1; }
     else if (pr.d - ext < inner) { pen = inner - (pr.d - ext); nSign = -1; }
