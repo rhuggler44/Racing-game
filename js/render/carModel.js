@@ -246,6 +246,99 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #69 Brady Bacon: white car with red/blue sweeping stripes, Concord American
+  // Flagpole on the hood sides, blue eagle on the tail, blue lower tail, BACON plate
+  bacon69(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f7f7f5', red = '#e0242f', blue = '#1d3f9e', sky = '#3f8de0', black = '#111111';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // red + blue stripes sweeping from low at the front up toward the rear
+    const sweep = (w, h, rr, y0 = 0.92, y1 = 0.55) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      const band = (off, thick, col) => {
+        x.fillStyle = col; x.beginPath();
+        x.moveTo(0, h * (y0 + off)); x.quadraticCurveTo(w * 0.55, h * (y0 + off - 0.1), w, h * (y1 + off));
+        x.lineTo(w, h * (y1 + off + thick)); x.quadraticCurveTo(w * 0.55, h * (y0 + off - 0.1 + thick), 0, h * (y0 + off + thick)); x.fill();
+      };
+      band(-0.06, 0.035, red); band(0.0, 0.03, sky); band(0.045, 0.06, blue);
+      x.restore();
+    };
+    // hood sides: CONCORD AMERICAN in red, FLAGPOLE spaced out in blue
+    const hoodSide = (w, h, rr) => {
+      sweep(w, h, rr, 0.98, 0.72);
+      x.save(); x.translate(w * 0.56, h * 0.42); x.rotate(rr ? -0.12 : 0.12);
+      txt('CONCORD', 0, -h * 0.2, h * 0.28, red, { maxW: w * 0.62 });
+      txt('AMERICAN', 0, h * 0.08, h * 0.28, red, { maxW: w * 0.7 });
+      x.font = `700 ${Math.floor(h * 0.15)}px Arial, sans-serif`; x.fillStyle = blue; x.textAlign = 'center';
+      x.fillText('F  L  A  G  P  O  L  E', 0, h * 0.32, w * 0.66);
+      x.restore();
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h, rr) => { sweep(w, h, rr, 1.0, 0.8); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides: stripes continue, a few small sponsors
+    const cockSide = (w, h) => {
+      x.fillStyle = blue; x.fillRect(0, h * 0.86, w, h * 0.14);
+      x.fillStyle = sky; x.fillRect(0, h * 0.82, w, h * 0.04);
+      x.fillStyle = red; x.fillRect(0, h * 0.77, w, h * 0.04);
+      txt('REO', w * 0.3, h * 0.55, h * 0.1, black);
+      txt('JAMES', w * 0.7, h * 0.55, h * 0.08, red, { italic: true });
+      txt('PENSKE', w * 0.5, h * 0.68, h * 0.06, black, { weight: 800 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: blue eagle up front, red/blue stripe, blue lower rear with the number
+    const eagle = (cx, cy, s, flip) => {
+      x.save(); x.translate(cx, cy); if (flip) x.scale(-1, 1); x.fillStyle = sky;
+      // wings
+      for (let i = 0; i < 6; i++) { x.beginPath(); x.moveTo(-s * 0.1, -s * 0.1); x.lineTo(-s * (0.3 + i * 0.12), -s * (0.85 - i * 0.1)); x.lineTo(-s * (0.2 + i * 0.12), -s * (0.75 - i * 0.12)); x.fill(); }
+      // body + head
+      x.beginPath(); x.ellipse(0, s * 0.1, s * 0.16, s * 0.34, -0.3, 0, Math.PI * 2); x.fill();
+      x.beginPath(); x.arc(s * 0.12, -s * 0.25, s * 0.1, 0, Math.PI * 2); x.fill();
+      x.beginPath(); x.moveTo(s * 0.2, -s * 0.27); x.lineTo(s * 0.32, -s * 0.22); x.lineTo(s * 0.2, -s * 0.18); x.fill();
+      // tail feathers
+      x.beginPath(); x.moveTo(-s * 0.1, s * 0.4); x.lineTo(-s * 0.3, s * 0.7); x.lineTo(s * 0.05, s * 0.5); x.fill();
+      x.restore();
+    };
+    const tailSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.fillStyle = blue; x.beginPath(); x.moveTo(w * 0.45, h); x.quadraticCurveTo(w * 0.7, h * 0.5, w, h * 0.3); x.lineTo(w, h); x.fill();
+      x.fillStyle = red; x.beginPath(); x.moveTo(w * 0.05, h * 0.92); x.quadraticCurveTo(w * 0.55, h * 0.62, w, h * 0.12); x.lineTo(w, h * 0.18); x.quadraticCurveTo(w * 0.55, h * 0.7, w * 0.05, h * 0.97); x.fill();
+      x.restore();
+      eagle(rr ? w * 0.28 : w * 0.72, h * 0.44, h * 0.5, !rr);
+      txt('69', rr ? w * 0.66 : w * 0.46, h * 0.6, h * 0.4, white, { italic: true, stroke: black, sw: 0.2, maxW: w * 0.26 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, 0, w, h * 0.35); x.fillStyle = red; x.fillRect(0, h * 0.35, w, h * 0.04); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, 0, w, h); });
+    // hood top: white with the red R Racer box toward the front
+    P.flat(R.hoodTop, true, (w, h) => {
+      x.save(); x.translate(w * 0.32, h * 0.5); x.rotate(Math.PI / 2);
+      x.fillStyle = red; x.fillRect(-h * 0.12, -w * 0.07, h * 0.24, w * 0.14);
+      txt('R', 0, -w * 0.01, w * 0.1, white, { italic: true });
+      x.restore();
+    });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('BACON', 0, 0, w * 0.6, white, { italic: true, stroke: red, sw: 0.1, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 400; i++) { x.fillStyle = `rgba(140,100,70,${0.06 + Math.random() * 0.12})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#dfe3e6', helmet: '#cfe6ff', coverLeft: false,
+      number: white, numberOutline: black, numberShadow: white, paintedTailNumbers: true,
+    };
+  },
+
   // #4 Justin Grant: black carbon on top, blue below with orange pinstripes,
   // big white NOS Energy Drink on the hood sides, white 4 on the blue nose,
   // Topp / MPV / Hemelgarn stack on the tail, GRANT plate, black wheels
@@ -396,7 +489,7 @@ const CUSTOM_LIVERIES = {
       txt('FINE LINE', cx, h * 0.62, h * 0.085, white, { maxW: w * 0.42 });
       txt('DRAFTING', cx, h * 0.74, h * 0.085, white, { weight: 700, maxW: w * 0.42 });
       // the number on the back of the tail: black with a red outline
-      const nx = rr ? w * 0.7 : w * 0.3;
+      const nx = rr ? w * 0.7 : w * 0.46;
       x.font = `italic 900 ${Math.floor(h * 0.56)}px "Arial Black", Arial, sans-serif`;
       x.lineWidth = h * 0.1; x.strokeStyle = red; x.strokeText('5T', nx, h * 0.5, w * 0.4);
       x.lineWidth = h * 0.04; x.strokeStyle = white; x.strokeText('5T', nx, h * 0.5, w * 0.4);
@@ -476,8 +569,8 @@ const CUSTOM_LIVERIES = {
       // the number lives on the back half of the tail
       x.lineWidth = h * 0.16; x.strokeStyle = white; x.lineJoin = 'round';
       x.font = `italic 900 ${Math.floor(h * 0.55)}px "Arial Black", Arial, sans-serif`;
-      x.strokeText('3P', rr ? w * 0.66 : w * 0.3, h * 0.48, w * 0.4);
-      txt('3P', rr ? w * 0.66 : w * 0.3, h * 0.48, h * 0.55, red, 900, w * 0.4, black);
+      x.strokeText('3P', rr ? w * 0.66 : w * 0.46, h * 0.48, w * 0.4);
+      txt('3P', rr ? w * 0.66 : w * 0.46, h * 0.48, h * 0.55, red, 900, w * 0.4, black);
     };
     P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
     // tail top: red at the front (behind the driver) with Premier Recycling
