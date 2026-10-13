@@ -107,8 +107,9 @@ const NOSE = (t) => ({ z: lerp(1.64, 1.3, t), bot: 0.4, top: lerp(0.55, 0.6, t),
 const HOOD = (t) => ({ z: lerp(1.3, 0.1, t), bot: lerp(0.4, 0.5, t), top: 0.6 + 0.43 * ease(t), wb: lerp(0.215, 0.33, t), wt: lerp(0.185, 0.285, t), rr: lerp(0.07, 0.14, t) });
 // cockpit sides: low up front, then the tall arm-guard panels beside the driver
 // rise toward the cage roof at the back (where the sponsor stacks go on real cars)
+const COCK_TOP = 1.56;
 const COCK = (t) => {
-  const r = ease(clamp01((t - 0.42) / 0.46));
+  const r = ease(clamp01((t - 0.45) / 0.3));
   return { z: lerp(0.1, -0.62, t), bot: 0.34, top: lerp(1.02, 1.06, t) + 0.5 * r, wb: 0.33, wt: lerp(0.31, 0.275, r) };
 };
 const TAIL = (t) => {
@@ -150,9 +151,12 @@ function buildBodyGeometry() {
     const hw = 0.13 * (0.6 + 0.4 * Math.sin(Math.min(1, u * 2) * Math.PI / 2));
     return [-hw * Math.sin(a), s.top + 0.004 + rise * Math.cos(a) ** 0.8, s.z];
   }, R.hoodTop, (u, v) => [0.55 + u * 0.4, 0.3 + v * 0.4]));
-  // cockpit sides (paint panel is rotated 90 degrees)
-  parts.push(panel(6, 4, sideFn(COCK, LEFT), R.cockpitL, (u, h) => [1 - h, 1 - u]));
-  parts.push(panel(6, 4, sideFn(COCK, RIGHT), R.cockpitR, (u, h) => [1 - h, u]));
+  // cockpit sides (paint panel is rotated 90 degrees). The paint maps by height
+  // above the bottom edge, so lettering stays level where the panel rises: the
+  // low front part shows the bottom of the paint, the tall back part all of it.
+  const cockV = (u, h) => { const c = COCK(u); return (lerp(c.bot, c.top, h) - c.bot) / (COCK_TOP - c.bot); };
+  parts.push(panel(16, 6, sideFn(COCK, LEFT), R.cockpitL, (u, h) => [1 - cockV(u, h), 1 - u]));
+  parts.push(panel(16, 6, sideFn(COCK, RIGHT), R.cockpitR, (u, h) => [1 - cockV(u, h), u]));
   // tail tank
   parts.push(panel(12, 4, sideFn(TAIL, LEFT), R.tailSideL, (u, h) => [0.12 + u * 0.8, 0.95 - h * 0.85]));
   parts.push(panel(12, 4, sideFn(TAIL, RIGHT), R.tailSideR, (u, h) => [u, h]));
@@ -252,6 +256,93 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #23 Halle Richey: pink car, Alliance Bank as the main sponsor (white waving
+  // flag logo and serif lettering on the bank's green), white 23 outlined green
+  richey23(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const pink = '#f2559e', hot = '#d62b80', green = '#3f8f63', white = '#ffffff', black = '#151515';
+    x.fillStyle = pink; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = opt.align || 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    const serif = 'Georgia, "Times New Roman", serif';
+    // Alliance Bank logo: a white flag waving to the right (three swept bands)
+    // over "Alliance", with "Bank" under the A. (cx, cy) = center, s = height.
+    const alliance = (cx, cy, s, bg) => {
+      if (bg) {
+        x.fillStyle = green; x.beginPath(); x.roundRect(cx - s * 1.1, cy - s * 0.55, s * 2.2, s * 1.1, s * 0.12); x.fill();
+        x.strokeStyle = white; x.lineWidth = s * 0.03; x.stroke();
+      }
+      const fx = cx - s * 0.78, fy = cy - s * 0.42, fw = s * 1.05, fh = s * 0.36;
+      x.save(); x.translate(fx, fy);
+      x.fillStyle = white;
+      x.beginPath();
+      x.moveTo(0, 0); x.quadraticCurveTo(fw * 0.45, fh * 0.1, fw, -fh * 0.12);
+      x.quadraticCurveTo(fw * 0.62, fh * 0.35, fw * 0.32, fh); x.lineTo(fw * 0.12, fh);
+      x.quadraticCurveTo(fw * 0.08, fh * 0.45, 0, 0); x.fill();
+      // the swept stripes are cut into the flag in the background color
+      x.strokeStyle = bg ? green : pink; x.lineWidth = fh * 0.07;
+      for (let i = 1; i <= 3; i++) {
+        const f = i / 4.2;
+        x.beginPath(); x.moveTo(fw * (0.03 + f * 0.12), fh * f);
+        x.quadraticCurveTo(fw * 0.55, fh * (f + 0.12), fw * (0.98 - f * 0.4), -fh * 0.12 + fh * f * 1.1); x.stroke();
+      }
+      x.restore();
+      txt('Alliance', cx - s * 0.86, cy + s * 0.12, s * 0.48, white, { align: 'left', weight: 400, font: serif, maxW: s * 1.85 });
+      txt('Bank', cx - s * 0.86, cy + s * 0.43, s * 0.2, white, { align: 'left', weight: 400, font: serif });
+    };
+    // hood sides: the big Alliance Bank panel, white/green pinstripes
+    const hoodSide = (w, h, rr) => {
+      x.fillStyle = white; x.fillRect(0, h * 0.06, w, h * 0.025);
+      x.fillStyle = hot; x.fillRect(0, h * 0.8, w, h * 0.2);
+      x.fillStyle = white; x.fillRect(0, h * 0.78, w, h * 0.02);
+      alliance(w * 0.5, h * 0.43, h * 0.74, true);
+      const lows = [['HOOSIER', 0.15], ['WELD', 0.85]];
+      for (const [t, f] of lows) txt(t, w * f, h * 0.9, h * 0.07, white, { weight: 800, maxW: w * 0.14 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { x.fillStyle = hot; x.fillRect(0, h * 0.75, w, h * 0.25); x.fillStyle = white; x.fillRect(0, h * 0.72, w, h * 0.04); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides (x = 0 is the back): tall panel at the back with the logo again
+    const cockSide = (w, h) => {
+      x.fillStyle = green; x.fillRect(0, 0, w * 0.45, h);
+      x.fillStyle = white; x.fillRect(w * 0.45, 0, w * 0.015, h);
+      alliance(w * 0.24, h * 0.32, w * 0.2, false);
+      txt('RICHEY', w * 0.72, h * 0.5, h * 0.12, white, { stroke: hot, sw: 0.12, maxW: w * 0.46 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: pink with a white sweep, white 23 outlined green, logo up front
+    const tailSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.fillStyle = hot; x.beginPath(); x.moveTo(0, h); x.lineTo(0, h * 0.72); x.quadraticCurveTo(w * 0.5, h * 0.7, w, h * 0.35); x.lineTo(w, h); x.fill();
+      x.strokeStyle = white; x.lineWidth = h * 0.025; x.beginPath(); x.moveTo(0, h * 0.7); x.quadraticCurveTo(w * 0.5, h * 0.68, w, h * 0.33); x.stroke();
+      x.restore();
+      alliance(rr ? w * 0.2 : w * 0.8, h * 0.32, h * 0.32, true);
+      txt('23', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.42, white, { italic: true, stroke: green, sw: 0.14, maxW: w * 0.32 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { alliance(w * 0.5, h * 0.28, h * 0.3, true); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = hot; x.fillRect(0, h * 0.6, w, h * 0.4); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = white; x.fillRect(w * 0.3, 0, w * 0.012, h); x.fillStyle = hot; x.fillRect(0, 0, w * 0.3, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = green; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('RICHEY', 0, 0, w * 0.6, white, { stroke: black, sw: 0.08, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#e9e9e6', roof: pink, rim: '#cfd3d6', helmet: pink, coverLeft: false,
+      number: white, numberOutline: green, numberShadow: hot, paintedTailNumbers: true,
+    };
+  },
+
   // #9Z Zack Pretorious: Monster Energy car, flat charcoal with a glowing green
   // eye and the claw on the cockpit sides, green BEAST graffiti on the hood,
   // white 9 in a green-outlined box with a green Z on the tail
@@ -509,15 +600,15 @@ const CUSTOM_LIVERIES = {
     // cockpit sides: white sponsor panel at the back, the band across the bottom
     const cockSide = (w, h) => {
       x.fillStyle = teal; x.fillRect(0, 0, w, h * 0.05);
-      x.fillStyle = pink; x.fillRect(0, h * 0.55, w, h * 0.32);
-      x.fillStyle = purple; x.fillRect(0, h * 0.58, w, h * 0.26);
-      x.fillStyle = teal; x.fillRect(0, h * 0.68, w, h * 0.05);
-      x.fillStyle = pink; x.fillRect(0, h * 0.735, w, h * 0.012);
+      x.fillStyle = pink; x.fillRect(0, h * 0.64, w, h * 0.3);
+      x.fillStyle = purple; x.fillRect(0, h * 0.67, w, h * 0.24);
+      x.fillStyle = teal; x.fillRect(0, h * 0.76, w, h * 0.05);
+      x.fillStyle = pink; x.fillRect(0, h * 0.815, w, h * 0.012);
       const top = [['ENGLER', 0.12], ['LUCAS OIL CENTER', 0.25], ['DEWIG MEATS', 0.38]];
       for (const [t, fy] of top) txt(t, w * 0.25, h * fy, h * 0.09, purple, { maxW: w * 0.42 });
       txt('S&C MACHINE', w * 0.72, h * 0.25, h * 0.07, purple, { maxW: w * 0.4 });
       txt('SUPERIOR', w * 0.72, h * 0.42, h * 0.08, black, { italic: true, maxW: w * 0.4 });
-      txt('BROWN BROTHERS', w * 0.5, h * 0.79, h * 0.06, white, { maxW: w * 0.6 });
+      txt('BROWN BROTHERS', w * 0.5, h * 0.87, h * 0.05, white, { maxW: w * 0.6 });
     };
     P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
     // tail sides: white with the big teal 92 outlined purple
