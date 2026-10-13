@@ -246,6 +246,88 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #14 Jadon Rogers: white car, giant black Beasley's script with the train
+  // logo and "Railcar Repair Corp" on the hood sides, black tail top with Lucky
+  // Seven / Parallax, big white 14 outlined black and red on the tail
+  rogers14(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f5f5f2', black = '#111111', red = '#d42a2a';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke2) { x.lineWidth = size * (opt.sw2 || 0.3); x.strokeStyle = opt.stroke2; x.strokeText(t, px, py, opt.maxW); }
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    const script = '"Brush Script MT", "Segoe Script", "Snell Roundhand", cursive';
+    // a simple steam-locomotive badge
+    const train = (cx, cy, s, faceRight) => {
+      x.save(); x.translate(cx, cy); if (!faceRight) x.scale(-1, 1);
+      x.fillStyle = black;
+      x.fillRect(-s * 0.6, -s * 0.25, s * 0.9, s * 0.4);           // boiler
+      x.fillRect(-s * 0.75, -s * 0.5, s * 0.35, s * 0.65);          // cab
+      x.fillRect(s * 0.05, -s * 0.5, s * 0.12, s * 0.25);           // stack
+      x.beginPath(); x.moveTo(s * 0.3, s * 0.15); x.lineTo(s * 0.55, s * 0.32); x.lineTo(s * 0.3, s * 0.32); x.fill(); // cowcatcher
+      x.fillStyle = white;
+      for (const wx of [-0.5, -0.2, 0.1]) { x.beginPath(); x.arc(wx * s, s * 0.22, s * 0.11, 0, 7); x.fill(); }
+      x.fillStyle = black;
+      for (const wx of [-0.5, -0.2, 0.1]) { x.beginPath(); x.arc(wx * s, s * 0.22, s * 0.06, 0, 7); x.fill(); }
+      x.restore();
+    };
+    // hood sides
+    const hoodSide = (w, h, rr) => {
+      const back = (f) => (rr ? w * (1 - f) : w * f); // f measured from the cockpit end
+      txt("Beasley's", back(0.38), h * 0.42, h * 0.74, black, { font: script, weight: 700, stroke: white, sw: 0.08, stroke2: black, sw2: 0.16, maxW: w * 0.72 });
+      train(back(0.8), h * 0.32, h * 0.32, !rr);
+      txt('Railcar', back(0.8), h * 0.6, h * 0.1, black, { weight: 700, font: 'Arial, sans-serif' });
+      txt('Repair Corp', back(0.8), h * 0.71, h * 0.1, black, { weight: 700, font: 'Arial, sans-serif', maxW: w * 0.2 });
+      const lows = [['K1', 0.85, 0.88], ['NOS', 0.62, 0.88], ['HOOSIER', 0.44, 0.88], ['MIDWEST', 0.25, 0.88]];
+      for (const [t, f, fy] of lows) txt(t, back(f), h * fy, h * 0.08, black, { weight: 800, maxW: w * 0.16 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    // cockpit sides: the tail of the script swash + driver name
+    const cockSide = (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h * 0.12);
+      txt('ROGERS', w * 0.5, h * 0.24, h * 0.07, white, { weight: 800, stroke: black, sw: 0.4 });
+      txt('K1', w * 0.5, h * 0.52, h * 0.18, black, { italic: true });
+      txt('AMSOIL', w * 0.5, h * 0.7, h * 0.07, black, { weight: 800 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: white with black top strip, big 14 toward the back
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h * 0.18);
+      txt('PARALLAX', rr ? w * 0.3 : w * 0.7, h * 0.09, h * 0.08, white, { font: 'Georgia, serif', maxW: w * 0.4 });
+      txt('14', rr ? w * 0.56 : w * 0.5, h * 0.52, h * 0.46, white, { italic: true, stroke: black, sw: 0.14, stroke2: red, sw2: 0.26, maxW: w * 0.4 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    // tail top: black with the Lucky Seven logo
+    P.flat(R.tailTop, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, h * 0.3, w, h * 0.7);
+      x.save(); x.translate(w * 0.5, h * 0.62); x.rotate(-Math.PI / 2);
+      x.fillStyle = red; x.fillRect(-h * 0.25, -w * 0.14, h * 0.1, w * 0.12);
+      txt('LUCKY SEVEN', h * 0.05, -w * 0.08, w * 0.11, white, { italic: true, maxW: h * 0.5 });
+      txt('TECHNOLOGIES', h * 0.05, w * 0.08, w * 0.06, white, { weight: 800, maxW: h * 0.45 });
+      x.restore();
+    });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = black; x.fillRect(0, 0, w, h * 0.25); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = black; x.fillRect(w * 0.8, 0, w * 0.2, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('ROGERS', 0, 0, w * 0.6, white, { italic: true, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 450; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.12})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#2a2a2a', rimColor: '#262626', helmet: '#f5f5f2', coverLeft: false,
+      number: white, numberOutline: black, numberShadow: red, paintedTailNumbers: true,
+    };
+  },
+
   // #39 Briggs Danner: black up top, sky blue down low split by yellow
   // pinstripes, yellow KEYSTONE CAP on the hood sides, yellow Apache Transport
   // panel on the tail top, sponsors on black tail sides, yellow 39 on blue
