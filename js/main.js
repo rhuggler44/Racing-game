@@ -13,7 +13,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // ---------------- settings ----------------
 const DEFAULTS = {
-  controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', camera: 'chase', quality: 'high', volume: 0.9,
+  controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', pedals: 'slider', camera: 'chase', quality: 'high', volume: 0.9,
   laps: 25, field: 22, difficulty: 'pro', startPos: 'random', prep: 'dialed', hotPrep: 'dialed', time: 'night',
 };
 const store = {
@@ -154,6 +154,7 @@ async function startSession(mode) {
   hideAll();
   $('hud').classList.remove('hidden');
   document.body.classList.toggle('touch-steer', settings.controls === 'touch');
+  document.body.classList.toggle('pedals-button', settings.pedals === 'button');
   $('tower').classList.toggle('hidden', !isRace);
   setCam(settings.camera);
   camInit = true;
@@ -457,8 +458,15 @@ function frame(now) {
   renderer.render(scene, camera);
 }
 
+const gasFill = document.querySelector('#pedal-gas .fill'), brakeFill = document.querySelector('#pedal-brake .fill');
+const gasPct = document.querySelector('#pedal-gas .pct'), brakePct = document.querySelector('#pedal-brake .pct');
+const pedalShown = { g: -1, b: -1 };
 function renderSession(dt) {
   const s = session, car = s.car;
+  // pedal sliders show how much gas / brake you're giving it
+  const gp = input.gasTouch ? input.gasTouch.v : 0, bp = input.brakeTouch ? input.brakeTouch.v : 0;
+  if (gp !== pedalShown.g) { pedalShown.g = gp; gasFill.style.height = `${gp * 100}%`; gasPct.textContent = input.gasTouch ? `${Math.round(gp * 100)}%` : ''; }
+  if (bp !== pedalShown.b) { pedalShown.b = bp; brakeFill.style.height = `${bp * 100}%`; brakePct.textContent = input.brakeTouch ? `${Math.round(bp * 100)}%` : ''; }
   trackScene.updateSurface(false);
   // player
   let roll = 0;

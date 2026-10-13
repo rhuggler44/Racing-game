@@ -54,22 +54,23 @@ export class Input {
 
   recenter() { this.tiltCenter = this.tiltRaw; }
 
+  // Gas and brake are sliders: thumb at the bottom of the bar = 0%, top = 100%,
+  // slide up and down to feather, lift off = 0. ("Button" mode = full on/off.)
   bindPedals(gasEl, brakeEl, steerEl) {
     const opts = { passive: false };
-    const gasPos = (t) => {
-      const r = gasEl.getBoundingClientRect();
-      // finger high on the pedal = more throttle
-      return clamp(1 - (t.clientY - r.top) / r.height, 0, 1) * 0.75 + 0.35;
+    const level = (el, t) => {
+      if (this.settings.pedals === 'button') return 1;
+      const r = el.getBoundingClientRect();
+      const f = 1 - (t.clientY - r.top) / r.height;      // 0 at the bottom, 1 at the top
+      return clamp((f - 0.06) / 0.86, 0, 1);             // small dead zones at both ends
     };
-    gasEl.addEventListener('touchstart', (e) => {
+    const press = (el, key) => (e) => {
       e.preventDefault();
       const t = e.changedTouches[0];
-      this.gasTouch = { id: t.identifier, v: clamp(gasPos(t), 0, 1) };
-    }, opts);
-    brakeEl.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.brakeTouch = { id: e.changedTouches[0].identifier };
-    }, opts);
+      this[key] = { id: t.identifier, v: level(el, t), el };
+    };
+    gasEl.addEventListener('touchstart', press(gasEl, 'gasTouch'), opts);
+    brakeEl.addEventListener('touchstart', press(brakeEl, 'brakeTouch'), opts);
     if (steerEl) {
       steerEl.addEventListener('touchstart', (e) => {
         e.preventDefault();
@@ -79,7 +80,10 @@ export class Input {
     }
     const move = (e) => {
       for (const t of e.changedTouches) {
-        if (this.gasTouch && t.identifier === this.gasTouch.id) this.gasTouch.v = clamp(gasPos(t), 0, 1);
+        for (const key of ['gasTouch', 'brakeTouch']) {
+          const p = this[key];
+          if (p && t.identifier === p.id) p.v = level(p.el, t);
+        }
         if (this.steerTouch && t.identifier === this.steerTouch.id) this.steerTouch.x = t.clientX;
       }
     };
@@ -93,9 +97,13 @@ export class Input {
     window.addEventListener('touchmove', move, opts);
     window.addEventListener('touchend', end, opts);
     window.addEventListener('touchcancel', end, opts);
-    // mouse for desktop testing
-    gasEl.addEventListener('mousedown', (e) => { this.gasTouch = { id: 'm', v: 1 }; });
-    brakeEl.addEventListener('mousedown', () => { this.brakeTouch = { id: 'm' }; });
+    // mouse for desktop testing (drag works like a thumb)
+    const mdown = (el, key) => (e) => { this[key] = { id: 'm', v: level(el, e), el }; };
+    gasEl.addEventListener('mousedown', mdown(gasEl, 'gasTouch'));
+    brakeEl.addEventListener('mousedown', mdown(brakeEl, 'brakeTouch'));
+    window.addEventListener('mousemove', (e) => {
+      for (const key of ['gasTouch', 'brakeTouch']) { const p = this[key]; if (p && p.id === 'm') p.v = level(p.el, e); }
+    });
     window.addEventListener('mouseup', () => {
       if (this.gasTouch && this.gasTouch.id === 'm') this.gasTouch = null;
       if (this.brakeTouch && this.brakeTouch.id === 'm') this.brakeTouch = null;
@@ -132,7 +140,8 @@ export class Input {
 
     thr = this.gasTouch ? this.gasTouch.v : 0;
     if (kbGas) thr = 1;
-    brk = this.brakeTouch || kbBrake ? 1 : 0;
+    brk = this.brakeTouch ? this.brakeTouch.v : 0;
+    if (kbBrake) brk = 1;
 
     this.steer += (steerT - this.steer) * Math.min(1, dt * 18);
     this.throttle += (thr - this.throttle) * Math.min(1, dt * 14);

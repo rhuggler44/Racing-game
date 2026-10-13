@@ -239,8 +239,17 @@ export class Car {
   //    and the car pushes up the track toward the cushion
   _easy(dt, inp, sm, mu, crr, bank, aIn) {
     const P = this.p, surf = this.surface;
-    const thr = clamp(inp.throttle, 0, 1), brk = clamp(inp.brake, 0, 1), steer = clamp(inp.steer, -1, 1);
+    let thr = clamp(inp.throttle, 0, 1);
+    const brk = clamp(inp.brake, 0, 1), steer = clamp(inp.steer, -1, 1);
     const wrap = (a) => (a > Math.PI ? a - 2 * Math.PI : a < -Math.PI ? a + 2 * Math.PI : a);
+    // throttle assist (with driving aids on): a little traction control that eases
+    // the gas when you're spinning the tires so much the car pushes up the track,
+    // or it's getting too sideways. Helps most coming off the turns on a slick track.
+    if (this.assists) {
+      const over = (this.pushing ? 0.25 : 0) + Math.max(0, (this._slide || 0) - 0.5) * 1.5;
+      this._tcCut = (this._tcCut || 0) + (clamp(over, 0, 0.45) - (this._tcCut || 0)) * Math.min(1, dt * 6);
+      thr *= 1 - this._tcCut;
+    }
     let c = Math.cos(this.th), s = Math.sin(this.th);
     let vx = this.u * c - this.v * s, vz = this.u * s + this.v * c;
     const sp = Math.hypot(vx, vz);
@@ -263,7 +272,7 @@ export class Car {
 
     // ---- how fast the path turns ----
     const steerRate = steer * (0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
-    let turn = steerRate - slide * 1.6 - 0.04 * sf * cornering;   // + right, - left (stagger pulls left in turns)
+    let turn = steerRate - slide * 1.85 - 0.06 * sf * cornering;   // + right, - left (stagger pulls left in turns)
     if (fwd < 0) turn = -steer * 0.8;
     const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 1.8);
     let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));

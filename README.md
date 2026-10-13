@@ -15,8 +15,9 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 
 ### Controls
 - **Steer:** tilt the phone like a steering wheel. Re-center from the pause menu if it drifts.
-- **Gas (right thumb):** the higher your thumb sits on the pedal, the more throttle. Feather it off the corners or you'll spin the rear tires and get sideways.
-- **Brake (left thumb):** hold it while stopped to back up.
+- **Gas (right thumb) and brake (left thumb) are sliders:** thumb at the bottom of the bar = 0%, top = 100%, and the bar fills to show how much you're giving it. Slide up and down to feather, lift off to let go. Settings → Pedals → Buttons switches to full on/off.
+- **Throttle assist** (part of Driving aids): eases the gas a little when you're spinning the tires so much you'd push up the track, or getting too sideways.
+- Hold the brake while stopped to back up.
 - **CAM:** switch between the chase cam and the in-cockpit view.
 - Desktop testing: arrow keys / WASD, `C` switches camera, `P` pauses, `R` resets the car.
 

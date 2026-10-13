@@ -42,8 +42,8 @@
     <div id="tower"></div>
     <button id="btn-reset" class="hidden">RESET CAR</button>
     <div id="steer-zone"></div>
-    <div id="pedal-brake" class="pedal"><span>BRAKE</span></div>
-    <div id="pedal-gas" class="pedal"><span>GAS</span><i>slide up for more</i></div>
+    <div id="pedal-brake" class="pedal"><div class="fill"></div><span>BRAKE</span><b class="pct"></b></div>
+    <div id="pedal-gas" class="pedal"><div class="fill"></div><span>GAS</span><b class="pct"></b><i>slide up / down</i></div>
   </div>
 
   <!-- ===== MENUS ===== -->
@@ -82,6 +82,7 @@
     <div class="panel">
       <h2>Settings</h2>
       <div class="opt"><label>Steering</label><div class="seg" data-key="controls" data-vals="tilt,touch" data-labels="Tilt,Touch drag"></div></div>
+      <div class="opt"><label>Pedals</label><div class="seg" data-key="pedals" data-vals="slider,button" data-labels="Sliders,Buttons (full on/off)"></div></div>
       <div class="opt"><label>Tilt range</label><div class="seg" data-key="tiltRange" data-vals="18,25,35" data-labels="Twitchy,Normal,Relaxed"></div></div>
       <div class="opt"><label>Invert tilt</label><div class="seg" data-key="invert" data-vals="false,true" data-labels="No,Yes"></div></div>
       <div class="opt"><label>Handling</label><div class="seg" data-key="handling" data-vals="easy,sim" data-labels="Easy (throttle steer),Realistic"></div></div>
@@ -123,7 +124,7 @@
     <div class="panel">
       <h2>Hold it like a steering wheel</h2>
       <p>Turn your phone sideways and hold it level in front of you. Tilt left and right to steer.</p>
-      <p class="small muted">Right thumb: gas (slide your thumb up the pedal for more). Left thumb: brake.</p>
+      <p class="small muted">Gas and brake are sliders: thumb low on the bar = a little, high = a lot. Slide to feather, lift off to let go.</p>
       <div class="btn-row"><button class="btn primary" data-act="tilt-go">I'm ready</button></div>
     </div>
   </div>
