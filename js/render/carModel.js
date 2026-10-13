@@ -246,6 +246,71 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #16 Harley Burns: black car with neon green, a big green BrittAero outlined
+  // black on the hood sides, green sponsor panel at the back of the cockpit,
+  // green pinstripes and a white 16 outlined green on the black tail
+  burns16(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const black = '#111213', green = '#3ff23a', white = '#f4f5f6';
+    x.fillStyle = black; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // hood sides: green top edge sweeping down to the nose, giant BrittAero
+    const hoodSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.fillStyle = green;
+      x.beginPath(); x.moveTo(0, 0); x.lineTo(w, 0); x.lineTo(w, h * 0.16); x.lineTo(0, h * 0.34); x.fill();
+      x.restore();
+      txt('BRITTAERO', w * 0.5, h * 0.56, h * 0.44, green, { stroke: white, sw: 0.06, maxW: w * 0.86 });
+      txt('A Division of Britt Tool Inc.', rr ? w * 0.7 : w * 0.3, h * 0.8, h * 0.06, white, { weight: 700, maxW: w * 0.3 });
+      txt('theacecorp.com', rr ? w * 0.75 : w * 0.25, h * 0.24, h * 0.06, black, { weight: 800, maxW: w * 0.22 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { x.fillStyle = green; x.fillRect(0, 0, w, h * 0.3); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides (x = 0 is the back): green sponsor panel at the back, black up front
+    const cockSide = (w, h) => {
+      x.fillStyle = green;
+      x.beginPath(); x.moveTo(0, 0); x.lineTo(w * 0.62, 0); x.lineTo(w * 0.62, h * 0.12); x.lineTo(w * 0.42, h * 0.45); x.lineTo(w * 0.42, h); x.lineTo(0, h); x.fill();
+      const list = [['JKR', 0.1], ['TIMBERLAND', 0.22], ["SMITH'S", 0.33], ['THE FLATS', 0.45], ['PDF SUPPLY', 0.57], ['bond', 0.7]];
+      for (const [t, fy] of list) txt(t, w * 0.2, h * fy, h * 0.075, black, { maxW: w * 0.34 });
+      x.fillStyle = white; x.fillRect(w * 0.05, h * 0.78, w * 0.3, h * 0.14);
+      txt('AUTO REPAIR', w * 0.2, h * 0.85, h * 0.06, '#c8102e', { maxW: w * 0.27 });
+      txt('COUNTRY', w * 0.52, h * 0.06, h * 0.06, black, { maxW: w * 0.16 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: black with green pinstripes and the white 16 outlined green
+    const tailSide = (w, h, rr) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      x.strokeStyle = green; x.lineWidth = h * 0.025;
+      x.beginPath(); x.moveTo(w * 0.05, h * 0.95); x.quadraticCurveTo(w * 0.35, h * 0.2, w * 0.95, h * 0.08); x.stroke();
+      x.beginPath(); x.moveTo(w * 0.35, h * 0.5); x.lineTo(w * 0.62, h * 0.22); x.stroke();
+      x.restore();
+      txt('16', rr ? w * 0.6 : w * 0.48, h * 0.52, h * 0.44, white, { italic: true, stroke: green, sw: 0.1, maxW: w * 0.32 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = green; x.fillRect(0, h * 0.5, w, h * 0.04); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = green; x.fillRect(0, 0, w * 0.12, h); x.fillRect(w * 0.88, 0, w * 0.12, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = green; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('BURNS', 0, 0, w * 0.6, black, { maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#2a2b2d', roof: green, rim: '#cfd3d6', helmet: green, coverLeft: false,
+      number: white, numberOutline: green, numberShadow: black, paintedTailNumbers: true,
+    };
+  },
+
   // #57 Logan Seavey: navy blue car over black carbon, silver-white cockpit
   // panel with speed lines and the Mountain Mechanical Contractors oval, Indy
   // Powersports / Droplight / Composite Specialties, mint 57 outlined white,
