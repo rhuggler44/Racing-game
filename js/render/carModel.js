@@ -2215,7 +2215,7 @@ function wheel(R, Ri, w, side, atlasMat, coverRect, rimColor) {
 // ---------------- assemble ----------------
 let _bodyGeo, _numGeo, _numGeoNoTail;
 export async function buildSprintCar(drv) {
-  const liv = drv.isPlayer ? await playerAtlas() : aiAtlas(drv);
+  const liv = drv.raco ? await playerAtlas() : aiAtlas(drv);
   const atlasMat = new THREE.MeshPhongMaterial({ map: atlasTexture(liv.canvas), side: THREE.DoubleSide, shininess: 90, specular: '#444444' });
 
   const car = new THREE.Group();

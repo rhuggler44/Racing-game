@@ -57,7 +57,10 @@
         <button class="btn primary" data-go="hotlaps">Hot Laps</button>
         <button class="btn primary" data-go="night-setup">Race Night</button>
         <button class="btn primary" data-go="race-setup">Feature Race</button>
-        <button class="btn" data-go="settings">Settings</button>
+        <div class="menu-row">
+          <button class="btn" id="menu-driver" data-go="driver-select">Driver</button>
+          <button class="btn" data-go="settings">Settings</button>
+        </div>
       </div>
       <div id="menu-best" class="small muted"></div>
     </div>
@@ -122,6 +125,15 @@
         <button class="btn" data-act="quit">Menu</button>
         <button class="btn primary" id="results-again" data-act="restart">Race Again</button>
       </div>
+    </div>
+  </div>
+
+  <div id="driver-select" class="screen hidden">
+    <div class="panel wide">
+      <h2>Pick your driver</h2>
+      <p class="small muted">Drive any car in the field. If you're not in the #44, it races against you.</p>
+      <div id="driver-grid"></div>
+      <div class="btn-row"><button class="btn" data-go="menu">Back</button></div>
     </div>
   </div>
 

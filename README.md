@@ -40,6 +40,7 @@ Best hot laps are saved separately for each track.
   - *After Heavy Rain:* tacky and fast early, but the cushion gets tall and choppy and can hook you.
   - *Dry Slick:* throttle control wins.
 - **Lincoln Park layout, modeled on photos of the track:** a wall on the front stretch only, no wall in turns 1-2 (jump the cushion and you go over the bank), a backstretch wall set back off the track, flat runoff out to the pits in turns 3-4, and a clay berm ringing the infield. Night or day.
+- **Driver select** (main menu): drive any of the real cars. When you're not in the #44, it races against you as Ryan Huggler's car.
 - Your **#44 RACO Marketing** car. The iRacing paint file (`assets/paint/raco-44-iracing-scheme.jpg`) is mapped panel by panel onto the car (see `PAINT_REGIONS` in `js/render/carModel.js`), with a gold chassis and cage, painted left-side mud covers and the HUGGLER name plate.
 - Real Indiana drivers' cars (painted from photos) plus a few placeholder drivers, in `js/drivers.js`. Liveries are in `CUSTOM_LIVERIES` in `js/render/carModel.js`.
 

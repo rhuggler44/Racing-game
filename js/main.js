@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { buildTrack, Surface, PREPS, TRACKS, LINCOLN_PARK } from './track.js';
 import { Session } from './session.js';
 import { RaceNight } from './night.js';
-import { DRIVERS, PLAYER } from './drivers.js';
+import { DRIVERS, PLAYER, HUGGLER44 } from './drivers.js';
 import { Input } from './input.js';
 import { Sound } from './audio.js';
 import { TrackScene } from './render/scene.js';
@@ -14,7 +14,7 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // ---------------- settings ----------------
 const DEFAULTS = {
-  controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', pedals: 'slider', camera: 'chase', quality: 'high', volume: 0.9, soundMode: 'game',
+  controls: 'tilt', tiltRange: 25, invert: false, assists: true, handling: 'easy', pedals: 'slider', camera: 'chase', quality: 'high', volume: 0.9, soundMode: 'game', driver: '44',
   laps: 25, field: 22, difficulty: 'pro', track: 'lincoln-park', startPos: 'random', prep: 'dialed', hotPrep: 'dialed', time: 'night',
 };
 const store = {
@@ -113,9 +113,24 @@ let state = 'menu';
 let camMode = settings.camera;
 let lastSessionOpts = null;
 
+// ---------------- who you're driving ----------------
+// settings.driver = a car number. #44 is you in the RACO car; pick anyone else
+// and you drive their car while the #44 races as an AI car.
+function chosen() {
+  const drv = settings.driver !== '44' && DRIVERS.find((d) => d.number === settings.driver);
+  if (!drv) return { me: PLAYER, field: DRIVERS };
+  if (!chosen.cache || chosen.cache.drv !== drv) {
+    chosen.cache = { drv, me: { ...drv, isPlayer: true }, field: [HUGGLER44, ...DRIVERS.filter((d) => d !== drv)] };
+  }
+  return chosen.cache;
+}
+
 // ---------------- car meshes ----------------
+let playerMeshFor = null;
 async function ensureCars(drivers) {
-  if (!playerMesh) { playerMesh = await buildSprintCar(PLAYER); scene.add(playerMesh); }
+  const { me } = chosen();
+  if (playerMesh && playerMeshFor !== me) { scene.remove(playerMesh); playerMesh = null; }
+  if (!playerMesh) { playerMesh = await buildSprintCar(me); playerMeshFor = me; scene.add(playerMesh); }
   const need = drivers.filter((d) => !aiMeshes.has(d));
   const built = await Promise.all(need.map((d) => buildSprintCar(d)));
   need.forEach((d, i) => { aiMeshes.set(d, built[i]); scene.add(built[i]); });
@@ -148,11 +163,12 @@ async function startSession(mode, ev = null) {
   const isRace = mode === 'race';
   const prep = ev ? settings.prep : isRace ? settings.prep : settings.hotPrep;
   if (!ev || ev.kind === 'qual') surface.setPrep(prep); // a night keeps one surface all night
-  const drivers = ev && ev.grid ? ev.grid.filter((e) => !e.isPlayer).map((e) => e.driver) : isRace ? DRIVERS.slice(0, settings.field - 1) : [];
+  const { me, field } = chosen();
+  const drivers = ev && ev.grid ? ev.grid.filter((e) => !e.isPlayer).map((e) => e.driver) : isRace ? field.slice(0, settings.field - 1) : [];
   await ensureCars(drivers);
   session = new Session({
     track, surface, mode, laps: ev ? ev.laps : settings.laps, fieldSize: settings.field, difficulty: settings.difficulty,
-    startPos: settings.startPos, drivers: DRIVERS, player: PLAYER, assists: settings.assists, handling: settings.handling,
+    startPos: settings.startPos, drivers: field, player: me, assists: settings.assists, handling: settings.handling,
     grid: ev && ev.grid, surfaceLaps: ev ? ev.surfaceLaps : 0, qualLaps: ev ? ev.laps : 2,
   });
   if (mode === 'hotlaps') session.bestLap = store.get(bestKey(prep), Infinity) || Infinity;
@@ -194,11 +210,30 @@ function setCam(m) {
 }
 
 // ---------------- UI wiring ----------------
-const screens = ['menu', 'race-setup', 'settings', 'pause', 'results', 'tilt-prompt', 'rotate', 'loading', 'night'];
+const screens = ['menu', 'race-setup', 'settings', 'pause', 'results', 'tilt-prompt', 'rotate', 'loading', 'night', 'driver-select'];
 function hideAll() { screens.forEach((s) => $(s).classList.add('hidden')); }
 function show(id) { hideAll(); $(id).classList.remove('hidden'); if (id === 'menu') refreshMenu(); }
 
+// ---------------- driver select ----------------
+function showDriverSelect() {
+  const all = [PLAYER, ...DRIVERS.filter((d) => d.livery)];
+  $('driver-grid').innerHTML = all.map((d) => {
+    const on = (d === PLAYER ? '44' : d.number) === settings.driver;
+    return `<button class="drv ${on ? 'on' : ''}" data-pick="${d.number}"><span class="num" style="background:${d.colors[0]};color:${d.colors[2]};border:1px solid ${d.colors[1]}">${d.number}</span><span>${d === PLAYER ? 'You (RACO Marketing)' : d.name}</span></button>`;
+  }).join('');
+  show('driver-select');
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-pick]');
+  if (!b) return;
+  settings.driver = b.dataset.pick;
+  saveSettings();
+  show('menu');
+});
+
 function refreshMenu() {
+  const { me } = chosen();
+  $('menu-driver').innerHTML = `Driver: <span class="num" style="background:${me.colors[0]};color:${me.colors[2]};border:1px solid ${me.colors[1]}">${me.number}</span> ${me === PLAYER ? 'You' : me.name.split(' ').slice(-1)[0]} <b>›</b>`;
   const b = store.get(bestKey(settings.hotPrep), null);
   const rec = TRACK_DEF.recordLap ? `Track record: ${TRACK_DEF.recordLap.toFixed(3)}s (${TRACK_DEF.recordBy})` : '';
   $('menu-best').textContent = b ? `Your best hot lap (${PREPS[settings.hotPrep].label}): ${b.toFixed(3)}s${recordText ? ' · ' + recordText : ''}` : rec;
@@ -260,6 +295,7 @@ document.addEventListener('click', (e) => {
     else if (t === 'night-setup') showSetup('night');
     else if (t === 'race-setup') showSetup('race');
     else if (t === 'night') beginNight();
+    else if (t === 'driver-select') showDriverSelect();
     else show(t);
   }
   if (act) {
@@ -331,7 +367,8 @@ function showSetup(kind) {
 }
 
 function beginNight() {
-  night = new RaceNight({ track, surface, drivers: DRIVERS, player: PLAYER, difficulty: settings.difficulty, featureLaps: settings.laps, fieldSize: settings.field });
+  const { me, field } = chosen();
+  night = new RaceNight({ track, surface, drivers: field, player: me, difficulty: settings.difficulty, featureLaps: settings.laps, fieldSize: settings.field });
   surface.setPrep(settings.prep);
   showNight();
 }
