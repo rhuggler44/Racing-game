@@ -126,6 +126,21 @@ body.touch-steer #steer-zone { pointer-events: auto; }
 body.touch-steer #pedal-brake { left: auto; right: calc(max(14px, var(--safe-r)) + 116px); width: 86px; height: 40vh; }
 body.touch-steer #pedal-gas { height: 60vh; }
 
+/* race night */
+#night-body h3 { margin: 12px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); }
+#night-body .nl { display: grid; gap: 2px; font-size: 13px; }
+#night-body .r { display: grid; grid-template-columns: 24px 44px 1fr 64px; gap: 6px; padding: 3px 6px; border-radius: 5px; align-items: center; }
+#night-body .r:nth-child(odd) { background: rgba(255, 255, 255, 0.04); }
+#night-body .r.me { background: rgba(242, 207, 126, 0.16); color: var(--gold); font-weight: 800; }
+#night-body .num { text-align: center; border-radius: 3px; font-weight: 800; }
+#night .panel { max-height: 94vh; display: flex; flex-direction: column; }
+#night-body { overflow-y: auto; min-height: 0; flex: 1; }
+#night .btn-row { flex: none; }
+.night-steps { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+.night-steps .done { color: #8bc48a; }
+.night-steps .now { color: var(--gold); }
+.night-steps b { color: var(--muted); font-weight: 400; }
+
 /* results */
 #results-list { display: grid; gap: 2px; font-size: 13px; max-height: 52vh; overflow-y: auto; }
 #results-list .r { display: grid; grid-template-columns: 28px 44px 1fr 70px; gap: 6px; padding: 4px 6px; border-radius: 5px; align-items: center; }

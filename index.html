@@ -55,6 +55,7 @@
       <div class="opt track-pick"><div class="seg" data-key="track" data-vals="lincoln-park,eldora" data-labels="Lincoln Park,Eldora"></div></div>
       <div class="btn-col">
         <button class="btn primary" data-go="hotlaps">Hot Laps</button>
+        <button class="btn primary" data-go="night-setup">Race Night</button>
         <button class="btn primary" data-go="race-setup">Feature Race</button>
         <button class="btn" data-go="settings">Settings</button>
       </div>
@@ -64,17 +65,18 @@
 
   <div id="race-setup" class="screen hidden">
     <div class="panel">
-      <h2>Feature Race</h2>
-      <div class="opt"><label>Laps</label><div class="seg" data-key="laps" data-vals="10,15,25" data-labels="10,15,25"></div></div>
+      <h2 id="setup-title">Feature Race</h2>
+      <p id="setup-night-info" class="small muted hidden">Qualifying, heat races, then the A-Main. The heats set the feature lineup.</p>
+      <div class="opt"><label id="setup-laps-label">Laps</label><div class="seg" data-key="laps" data-vals="10,15,25" data-labels="10,15,25"></div></div>
       <div class="opt"><label>Field</label><div class="seg" data-key="field" data-vals="12,16,22" data-labels="12,16,22 cars"></div></div>
       <div class="opt"><label>Competition</label><div class="seg" data-key="difficulty" data-vals="rookie,pro,outlaw" data-labels="Rookie,Pro,Outlaw"></div></div>
-      <div class="opt"><label>Start</label><div class="seg" data-key="startPos" data-vals="random,front,middle,back" data-labels="Draw,Pole,Middle,Tail"></div></div>
+      <div class="opt" id="setup-start-opt"><label>Start</label><div class="seg" data-key="startPos" data-vals="random,front,middle,back" data-labels="Draw,Pole,Middle,Tail"></div></div>
       <div class="opt"><label>Time</label><div class="seg" data-key="time" data-vals="night,day" data-labels="Night,Day"></div></div>
       <div class="opt"><label>Track</label><div class="seg" data-key="prep" data-vals="dialed,heavy,slick" data-labels="Dialed In,Heavy (Rain),Dry Slick"></div></div>
       <div id="prep-desc" class="small muted"></div>
       <div class="btn-row">
         <button class="btn" data-go="menu">Back</button>
-        <button class="btn primary" data-go="race">Start Race</button>
+        <button class="btn primary" id="setup-go" data-go="race">Start Race</button>
       </div>
     </div>
   </div>
@@ -118,7 +120,18 @@
       <div id="results-list"></div>
       <div class="btn-row">
         <button class="btn" data-act="quit">Menu</button>
-        <button class="btn primary" data-act="restart">Race Again</button>
+        <button class="btn primary" id="results-again" data-act="restart">Race Again</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="night" class="screen hidden">
+    <div class="panel wide">
+      <h2 id="night-title">Race Night</h2>
+      <div id="night-body"></div>
+      <div class="btn-row">
+        <button class="btn" data-act="quit">Quit Night</button>
+        <button class="btn primary" id="night-go" data-act="night-go">Go</button>
       </div>
     </div>
   </div>

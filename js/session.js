@@ -4,6 +4,7 @@ import { Car, autopilot } from './physics.js';
 import { AIField, SpeedProfile } from './ai.js';
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const shuffle = (list) => { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 export class Session {
   constructor(opts) {
@@ -19,27 +20,37 @@ export class Session {
     this.playerStatus = 'running'; // running | finished | dnf
     this.flag = 'green';
     this._pw = { x: 0, z: 0 };
+    // race night: the track is already worn in by earlier events
+    this.surfaceLaps = opts.surfaceLaps || 0;
+    this.qualLaps = opts.qualLaps || 2;
 
     if (mode === 'race') {
-      const n = clamp(fieldSize, 2, drivers.length + 1);
-      this.field = new AIField(track, surface, drivers.slice(0, n - 1), difficulty);
+      // opts.grid: a set starting order ({ driver, isPlayer } / { driver, skill })
+      const grid = opts.grid;
+      const aiEntries = grid ? grid.filter((e) => !e.isPlayer) : null;
+      const n = grid ? grid.length : clamp(fieldSize, 2, drivers.length + 1);
+      // a plain feature: the lineup is drawn fresh every race
+      const aiDrivers = aiEntries ? aiEntries.map((e) => e.driver) : shuffle(drivers.slice(0, n - 1));
+      const skills = aiEntries ? new Map(aiEntries.map((e) => [e.driver, e.skill])) : null;
+      this.field = new AIField(track, surface, aiDrivers, difficulty, skills);
       this.phase = 'pace';
       this.flag = 'none';
       this.paceSpeed = 21;
-      this._setupGrid(startPos, n);
+      this._setupGrid(grid ? grid.findIndex((e) => e.isPlayer) : startPos, n);
     } else {
       this.phase = 'running';
       this.car.reset(track.L * 0.55, -2, 18);
       this.profile = new SpeedProfile(track, surface);
       this.message('Out lap: the car drives itself. You take over at the line.', 4);
       this.lapStartTime = null;
-      surface.setLaps(0);
+      surface.setLaps(this.surfaceLaps);
+      if (mode === 'qual') this.message(`Qualifying: ${this.qualLaps} timed laps. The car drives itself until the line.`, 4);
     }
   }
 
   _setupGrid(startPos, n) {
     const t = this.track;
-    let k = startPos === 'front' ? 0 : startPos === 'back' ? n - 1 : startPos === 'middle' ? Math.floor(n / 2) : Math.floor(Math.random() * n);
+    let k = typeof startPos === 'number' ? startPos : startPos === 'front' ? 0 : startPos === 'back' ? n - 1 : startPos === 'middle' ? Math.floor(n / 2) : Math.floor(Math.random() * n);
     this.playerGridSlot = k;
     this.gridLeadS = t.L * 0.5 + 12;
     this.slots = new Map();
@@ -63,7 +74,7 @@ export class Session {
     }
     this.car.speedLimit = this.paceSpeed + 1.5;
     this.paceLeadS = this.gridLeadS;
-    this.surface.setLaps(0);
+    this.surface.setLaps(this.surfaceLaps);
     this.message('Pace lap: the car drives itself. You take over at the green.', 4);
   }
 
@@ -78,17 +89,24 @@ export class Session {
     const rows = this.field.cars.map((c) => ({
       name: c.driver.name, number: c.driver.number, colors: c.driver.colors,
       dist: c.S - L, finished: c.finished, finishOrder: c.finishOrder ?? 999, best: c.bestLap, isPlayer: false, ref: c,
-      dnf: false,
+      dnf: false, laps: c.finished ? c.finishLaps : Math.floor((c.S - L) / L), lineTime: c.lineTime ?? 0,
     }));
     rows.push({
       name: this.player.name, number: this.player.number, colors: this.player.colors,
       dist: this.car.S - L, finished: this.playerStatus === 'finished', finishOrder: this.playerFinishOrder ?? 999,
       best: this.bestLap, isPlayer: true, dnf: this.playerStatus === 'dnf',
+      laps: this.playerStatus === 'finished' ? this.playerFinishLaps : Math.floor((this.car.S - L) / L), lineTime: this._pLine ?? 0,
     });
+    // real running order: laps completed first (a lapped car stays a lap down,
+    // even if it takes the checkers ahead of the leader), then who got there first
+    const scoredAtLine = this.phase === 'checkered' || this.phase === 'done';
     rows.sort((a, b) => {
       if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
+      if (a.laps !== b.laps) return b.laps - a.laps;
       if (a.finished && b.finished) return a.finishOrder - b.finishOrder;
-      if (a.finished !== b.finished) return a.finished ? -1 : 1;
+      // once the checkers are out, it's scored at the line: same laps, whoever
+      // crossed first is ahead. Before that, it's where you are on the track.
+      if (scoredAtLine) return a.lineTime - b.lineTime;
       return b.dist - a.dist;
     });
     return rows;
@@ -125,7 +143,7 @@ export class Session {
     let inp = this.playerStatus === 'dnf' ? { steer: 0, throttle: 0, brake: 1 } : input;
     // the computer drives the pace lap / out lap; you get the car at the green / the line
     // and takes it back for the cool-down once you've taken the checkered flag
-    this.autoDriving = !car.flipped && (this.mode === 'race' ? this.phase === 'pace' || this.playerStatus === 'finished' : this.lapStartTime == null && !this._handedOver);
+    this.autoDriving = !car.flipped && (this.mode === 'race' ? this.phase === 'pace' || this.playerStatus === 'finished' : (this.lapStartTime == null && !this._handedOver) || this.playerStatus === 'finished');
     if (this.autoDriving) inp = this._autoInput();
     const sub = 2, h = dt / sub;
     for (let i = 0; i < sub; i++) car.step(h, inp);
@@ -162,7 +180,7 @@ export class Session {
 
   _autoInput() {
     const t = this.track, car = this.car;
-    if (this.mode === 'race' && this.playerStatus === 'finished') {
+    if (this.playerStatus === 'finished') {
       // cool-down: ease off and roll around down low
       const v = Math.max(18, car.u - 6);
       return autopilot(car, t, -t.W * 0.3, v);
@@ -190,13 +208,19 @@ export class Session {
         if (pb) this.bestLap = lt;
         this.message(`${lt.toFixed(3)}${pb ? '  BEST' : ''}`, 3, true);
         this.onLap && this.onLap(lt, pb);
+        if (this.mode === 'qual' && this.playerLaps.length >= this.qualLaps && this.playerStatus === 'running') {
+          this.playerStatus = 'finished';
+          this.phase = 'done';
+          this.message(`Qualified: ${this.bestLap.toFixed(3)}`, 4, true);
+          this.onDone && this.onDone();
+        }
       } else {
         this.message('GO! You have the car.', 1.8, true);
         this._handedOver = true;
         this.onHandover && this.onHandover();
       }
-      this.lapStartTime = this.time;
-      this.surface.setLaps(this.playerLaps.length * 1.0);
+      this.lapStartTime = this.playerStatus === 'running' ? this.time : null;
+      this.surface.setLaps(this.surfaceLaps + this.playerLaps.length * 1.0);
     }
     if (Math.floor(car.S / L) < Math.floor(prevS / L)) this.lapStartTime = null; // went backwards
   }
@@ -233,7 +257,7 @@ export class Session {
 
     // ---- surface evolves with the leader's laps ----
     const ll = this.leaderLaps();
-    if (this.phase !== 'pace') this.surface.setLaps(Math.floor(ll * 4) / 4);
+    if (this.phase !== 'pace') this.surface.setLaps(this.surfaceLaps + Math.floor(ll * 4) / 4);
 
     // ---- lap counting / flags ----
     if (this.phase !== 'pace') {
@@ -303,16 +327,19 @@ export class Session {
 
   _finish(c) {
     c.finished = true;
+    c.finishLaps = Math.floor((c.S - this.track.L) / this.track.L);
     this._finishCount = (this._finishCount || 0) + 1;
     c.finishOrder = this._finishCount;
-    if (this._finishCount === 1) this.message(`${c.driver.name} wins!`, 3, true);
+    if (this.standings()[0].ref === c && !this._winnerSaid) { this._winnerSaid = true; this.message(`${c.driver.name} wins!`, 3, true); }
   }
   _finishPlayer() {
     this.playerStatus = 'finished';
+    this.playerFinishLaps = Math.floor((this.car.S - this.track.L) / this.track.L);
     this._finishCount = (this._finishCount || 0) + 1;
     this.playerFinishOrder = this._finishCount;
     this._playerFinishAt = this.raceTime;
     const pos = this.playerPosition();
+    if (pos === 1) this._winnerSaid = true;
     this.message(pos === 1 ? 'YOU WIN!' : `Finished P${pos}`, 4, true);
   }
 

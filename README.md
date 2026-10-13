@@ -33,7 +33,8 @@ Best hot laps are saved separately for each track.
 
 ## What's in v1
 - **Hot laps** with a saved best lap. The track record is 12.276 s (Brady Bacon, 2018).
-- **Feature race** against up to 21 AI cars (Rookie, Pro or Outlaw; Outlaw runs right with a near-perfect lap), 10/15/25 laps, with a rolling two-wide start and green/white/checkered flags. Once you take the checkers your finish is locked in (even if you crash after), the computer drives your cool-down lap, and the race wraps up once everyone has taken the flag (15 seconds at most).
+- **Race Night**: a full USAC-style show. Qualify with 2 timed laps, then race your 8-lap heat (the field is dealt into heats by qualifying time, fastest few inverted), then the A-Main, lined up by heat finish with the top 6 inverted. The other heats are run in the background, and the track keeps wearing in through the night.
+- **Feature race** against up to 21 AI cars (Rookie, Pro or Outlaw; Outlaw runs right with a near-perfect lap). Each race draws a fresh lineup and every car's pace is rolled fresh, so it's a different driver up front each night. Lapped cars are scored a lap down, in real running order., 10/15/25 laps, with a rolling two-wide start and green/white/checkered flags. Once you take the checkers your finish is locked in (even if you crash after), the computer drives your cool-down lap, and the race wraps up once everyone has taken the flag (15 seconds at most).
 - **Track that changes through the night:** it starts tacky, the middle slicks off, and a cushion builds up top.
   - *Dialed In:* a solid bottom and a fast top, so both lines race well.
   - *After Heavy Rain:* tacky and fast early, but the cushion gets tall and choppy and can hook you.
@@ -48,10 +49,11 @@ Best hot laps are saved separately for each track.
 | `js/track.js` | Track definitions (Lincoln Park, Eldora), shape and banking, and the dirt surface model (grip, cushion, marbles) |
 | `js/physics.js` | Player car physics: throttle steer, banking, cushion, walls, flips |
 | `js/ai.js` | AI field: speed profiles per lane, groove choice, passing |
-| `js/session.js` | Hot laps and race flow: pace lap, flags, positions, contact |
+| `js/session.js` | Hot laps, qualifying and race flow: pace lap, flags, positions, contact |
+| `js/night.js` | Race Night: qualifying, heats, A-Main lineup |
 | `js/render/` | three.js track scene, car model/livery, dust and roost |
 | `js/input.js`, `js/audio.js` | Tilt/touch controls, synthesized 410 engine sound |
-| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs [eldora]`, `node tools/rejoin-test.mjs` for getting back on the track) |
+| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs [eldora]`, `node tools/night-test.mjs [eldora]`, `node tools/rejoin-test.mjs` for getting back on the track) |
 
 ## Hosting with GitHub Pages
 In the repo, go to **Settings → Pages**. Under *Build and deployment*, set *Source* to **Deploy from a branch**,
