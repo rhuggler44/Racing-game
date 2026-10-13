@@ -7,9 +7,11 @@ import { SPRINT_410 } from './physics.js';
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 export const DIFFICULTY = {
-  rookie: { label: 'Rookie', pace: 0.90, spread: 0.035 },
-  pro:    { label: 'Pro',    pace: 0.955, spread: 0.03 },
-  outlaw: { label: 'Outlaw', pace: 0.99, spread: 0.02 },
+  // pace is a multiple of the track's speed profile. A perfect Easy-handling lap
+  // runs about 1.1-1.2x, so Outlaw is right there with a fast player.
+  rookie: { label: 'Rookie', pace: 0.92, spread: 0.035 },
+  pro:    { label: 'Pro',    pace: 1.0, spread: 0.03 },
+  outlaw: { label: 'Outlaw', pace: 1.07, spread: 0.02 },
 };
 
 const LANES = 11; // dn 0.05 .. 0.95
@@ -111,7 +113,7 @@ export class AIField {
     this.cars = [];
     const D = DIFFICULTY[difficulty] || DIFFICULTY.pro;
     drivers.forEach((drv, i) => {
-      const skill = D.pace + (Math.random() - 0.5) * 2 * D.spread + (drv.rating || 0) * 0.01;
+      const skill = (D.pace + (Math.random() - 0.5) * 2 * D.spread + (drv.rating || 0) * 0.01) * (track.def.aiPace || 1);
       const pref = drv.groove ?? (i % 3 === 0 ? 1 : i % 3 === 1 ? -1 : 0);
       this.cars.push(new AICar(drv, skill, pref));
     });

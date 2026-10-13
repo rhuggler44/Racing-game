@@ -19,6 +19,7 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 - **Gas (right thumb) and brake (left thumb) are sliders:** thumb at the bottom of the bar = 0%, top = 100%, and the bar fills to show how much you're giving it. Slide up and down to feather, lift off to let go. Settings → Pedals → Buttons switches to full on/off.
 - **Throttle assist** (part of Driving aids): eases the gas a little when you're spinning the tires so much you'd push up the track, or getting too sideways.
 - Hold the brake while stopped to back up.
+- **Walls:** brush the wall and you bounce off and keep going; a big hit costs a lot of speed (and a hard enough one on the concrete flips you).
 - **CAM:** switch between the chase cam and the in-cockpit view.
 - **Sound plays** (Settings): *Always* plays the game sound even with the iPhone's silent switch on, but pauses your music. *With my music* mixes with Spotify / Apple Music, but the silent switch mutes the game. Sound **Off** never touches your music.
 - Desktop testing: arrow keys / WASD, `C` switches camera, `P` pauses, `R` resets the car.
@@ -26,13 +27,13 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 ## Tracks
 Pick the track on the main menu.
 - **Lincoln Park Speedway** (Putnamville, IN): 5/16-mile clay oval, open turns, wall on the front stretch only (details below).
-- **Eldora Speedway** (Rossburg, OH): the high-banked 1/2-mile, laid out from an in-car video. A concrete wall and catch fence all the way around, billboards along the fence in the turns, an inside wall with yellow pads, gray-brown clay, big grandstands down both straights and the tower out of turn 4. Banking and dimensions are approximate.
+- **Eldora Speedway** (Rossburg, OH): the high-banked 1/2-mile, laid out from an in-car video. A concrete wall and catch fence all the way around, billboards along the fence in the turns, an inside wall with yellow pads, a concrete infield packed with haulers, gray-brown clay, big grandstands down both straights and the tower out of turn 4. Banking and dimensions are approximate.
 
 Best hot laps are saved separately for each track.
 
 ## What's in v1
 - **Hot laps** with a saved best lap. The track record is 12.276 s (Brady Bacon, 2018).
-- **Feature race** against up to 21 AI cars, 10/15/25 laps, with a rolling two-wide start and green/white/checkered flags.
+- **Feature race** against up to 21 AI cars (Rookie, Pro or Outlaw; Outlaw runs right with a near-perfect lap), 10/15/25 laps, with a rolling two-wide start and green/white/checkered flags. Once you take the checkers your finish is locked in (even if you crash after), the computer drives your cool-down lap, and the race wraps up once everyone has taken the flag (15 seconds at most).
 - **Track that changes through the night:** it starts tacky, the middle slicks off, and a cushion builds up top.
   - *Dialed In:* a solid bottom and a fast top, so both lines race well.
   - *After Heavy Rain:* tacky and fast early, but the cushion gets tall and choppy and can hook you.

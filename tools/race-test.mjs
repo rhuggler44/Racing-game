@@ -1,4 +1,4 @@
-// Headless full-race check: node tools/race-test.mjs [track id, e.g. eldora]
+// Headless full-race check: node tools/race-test.mjs [track id, e.g. eldora] [rookie|pro|outlaw]
 import { buildTrack, Surface, TRACKS } from '../js/track.js';
 import { autopilot } from '../js/physics.js';
 import { Session } from '../js/session.js';
@@ -8,7 +8,7 @@ const track = buildTrack(TRACKS[process.argv[2]] || undefined);
 console.log(track.def.name);
 for (const prep of ['dialed', 'heavy']) {
   const surface = new Surface(track, prep);
-  const ses = new Session({ track, surface, mode: 'race', laps: 10, fieldSize: 22, difficulty: 'pro', startPos: 'middle', drivers: DRIVERS, player: PLAYER });
+  const ses = new Session({ track, surface, mode: 'race', laps: 10, fieldSize: 22, difficulty: process.argv[3] || 'pro', startPos: 'middle', drivers: DRIVERS, player: PLAYER });
   let done = false; ses.onDone = () => (done = true);
   const log = [];
   const dt = 1 / 60; let steps = 0;

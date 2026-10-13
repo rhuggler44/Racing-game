@@ -34,14 +34,16 @@ export const ELDORA = {
   location: 'Rossburg, Ohio',
   lengthLabel: '1/2 mile',
   length: 804.67,
-  straight: 150,
-  ramp: 40,
-  width: 20,
+  straight: 108,        // short straights, big sweeping turns (~80 m radius)
+  ramp: 45,
+  width: 24,
   bankTurn: 20 * DEG,
   bankStraight: 6 * DEG,
   recordLap: null,
   layout: 'walled',     // wall right at the edge all the way around
   inner: { apron: 2.4, edge: 2.9, wall: true },
+  grip: 0.85,  // the big, fast banks are tuned down to sane lap times
+  aiPace: 1.1,   // the AI's speed profile undersells these banks; this evens it up
   clay: [[104, 86, 70], [176, 158, 134], [88, 72, 58], [150, 134, 112]],
 };
 
@@ -271,7 +273,7 @@ export class Surface {
   }
   // grip coefficient at normalized lane dn (0 inside .. 1 wall).
   // Scaled so a hooked-up 410 can run near the 12.3s track record.
-  grip(dn) { return this.rawGrip(dn) * GRIP_SCALE; }
+  grip(dn) { return this.rawGrip(dn) * GRIP_SCALE * (this.track.def.grip || 1); }
   rawGrip(dn) {
     const p = this.prep, w = this.wear, c = this.cush;
     const bottom = p.g0 - w * 0.15;

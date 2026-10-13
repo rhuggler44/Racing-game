@@ -219,8 +219,8 @@ export class TrackScene {
     const t = this.track, W = t.W, edge = t.innerEdge, apronW = t.def.inner.apron;
     const ds = [-W / 2, -W / 2 - apronW * 0.5, -W / 2 - apronW, -W / 2 - edge, -W / 2 - edge - 3];
     const clay = new THREE.Color().setRGB(...t.def.clay[0].map((v) => (v * 0.85) / 255)).convertSRGBToLinear();
-    const grass = new THREE.Color('#3f6a2c');
-    const g = this._ribbon(ds, (s, d, j, c) => { if (j <= 3) c.copy(clay); else c.copy(grass); });
+    const concrete = new THREE.Color('#8e8a83');
+    const g = this._ribbon(ds, (s, d, j, c) => { if (j <= 3) c.copy(clay); else c.copy(concrete); });
     this.group.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
     const shape = new THREE.Shape(), p = {};
     for (let i = 0; i < this.NS; i++) {
@@ -229,7 +229,8 @@ export class TrackScene {
     }
     const ig = new THREE.ShapeGeometry(shape, 1);
     ig.rotateX(-Math.PI / 2);
-    const inf = new THREE.Mesh(ig, new THREE.MeshLambertMaterial({ color: '#3f6a2c' }));
+    // the whole infield is paved: it's the pit area, full of haulers
+    const inf = new THREE.Mesh(ig, new THREE.MeshLambertMaterial({ map: this._concreteTex() }));
     inf.position.y = -0.14;
     this.group.add(inf);
     // the inside wall: a low concrete band, yellow pads where it starts and ends
@@ -252,6 +253,65 @@ export class TrackScene {
     wg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     wg.setIndex(idx); wg.computeVertexNormals();
     this.group.add(new THREE.Mesh(wg, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+  }
+
+  _concreteTex() {
+    const c = canvas(256, 256), x = c.getContext('2d'), r = rng(31);
+    x.fillStyle = '#8e8a83'; x.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 1800; i++) { const v = 120 + r() * 40; x.fillStyle = `rgba(${v},${v - 3},${v - 8},0.25)`; x.fillRect(r() * 256, r() * 256, 1 + r() * 3, 1 + r() * 3); }
+    x.strokeStyle = 'rgba(60,58,54,0.5)'; x.lineWidth = 2;   // expansion joints
+    for (let i = 0; i <= 256; i += 64) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 256); x.moveTo(0, i); x.lineTo(256, i); x.stroke(); }
+    for (let i = 0; i < 14; i++) { x.fillStyle = `rgba(40,36,30,${0.08 + r() * 0.12})`; x.beginPath(); x.ellipse(r() * 256, r() * 256, 6 + r() * 20, 4 + r() * 12, r() * 3, 0, 7); x.fill(); } // oil stains
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(0.05, 0.05);
+    return t;
+  }
+
+  // Eldora's infield pits: rows of semis (trailer + tractor), a few toter rigs
+  // and pickups, all parked on the concrete
+  _buildInfieldPits() {
+    const t = this.track, W = t.W, r = rng(44);
+    const keep = -W / 2 - t.innerEdge - 7; // stay this far inside the inner wall
+    const spots = [];
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < t.N; i++) { minX = Math.min(minX, t.x[i]); maxX = Math.max(maxX, t.x[i]); minZ = Math.min(minZ, t.z[i]); maxZ = Math.max(maxZ, t.z[i]); }
+    const pr = {};
+    for (let z = minZ + 8; z < maxZ - 8; z += 13) {
+      for (let x0 = minX + 10; x0 < maxX - 10; x0 += 21) {
+        const x = x0 + (r() - 0.5) * 3, zz = z + (r() - 0.5) * 1.5;
+        // both ends of the rig (trailer + tractor) have to clear the inside wall
+        let ok = true;
+        for (const ex of [-12, 0, 12]) { t.project(x + ex, zz, -1, pr); if (pr.d > keep) ok = false; }
+        if (!ok) continue;
+        // leave a lane down the middle and some gaps
+        if (Math.abs(zz) < 5 || r() < 0.12) continue;
+        spots.push([x, zz, r() < 0.5 ? 0 : Math.PI]);
+      }
+    }
+    const n = spots.length;
+    const trailerCols = ['#f2f2f2', '#e8e8e8', '#1c1c1c', '#8a1a1a', '#1a3d8a', '#c9c9c9', '#2c5530', '#f37a1f', '#d0102a', '#f6f7f8', '#3c3fb8', '#111'];
+    const cabCols = ['#ffffff', '#111111', '#b71c1c', '#0d47a1', '#9e9e9e', '#1b5e20', '#f9a825'];
+    const box = new THREE.BoxGeometry(1, 1, 1);
+    const trailers = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: '#fff' }), n);
+    const cabs = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: '#fff' }), n);
+    const glass = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: '#1d2730' }), n);
+    const awn = new THREE.InstancedMesh(box, new THREE.MeshLambertMaterial({ color: '#fff' }), n);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+    const y = -0.14;
+    spots.forEach(([x, z, rot], i) => {
+      q.setFromAxisAngle(up, rot);
+      const dir = rot ? -1 : 1, L = 15 + r() * 2;
+      m4.compose(new THREE.Vector3(x, y + 2.05, z), q, new THREE.Vector3(L, 3.9, 2.6)); trailers.setMatrixAt(i, m4);
+      trailers.setColorAt(i, c.set(trailerCols[Math.floor(r() * trailerCols.length)]));
+      const cx = x + dir * (L / 2 + 2.6);
+      m4.compose(new THREE.Vector3(cx, y + 1.75, z), q, new THREE.Vector3(4.6, 3.1, 2.5)); cabs.setMatrixAt(i, m4);
+      cabs.setColorAt(i, c.set(cabCols[Math.floor(r() * cabCols.length)]));
+      m4.compose(new THREE.Vector3(cx + dir * 1.9, y + 2.4, z), q, new THREE.Vector3(0.9, 1.0, 2.3)); glass.setMatrixAt(i, m4);
+      // pop-up awning off the side of the trailer
+      m4.compose(new THREE.Vector3(x, y + 3.3, z + 2.9), q, new THREE.Vector3(L * 0.6, 0.12, 3.2)); awn.setMatrixAt(i, m4);
+      awn.setColorAt(i, c.set(['#d0102a', '#0d47a1', '#e8e8e8', '#1c1c1c', '#f9a825'][Math.floor(r() * 5)]));
+    });
+    this.group.add(trailers, cabs, glass, awn);
   }
 
   // ---------------- terrain outside the track ----------------
@@ -608,6 +668,7 @@ export class TrackScene {
 
   // ---------------- pits: haulers beyond the turn 3-4 runoff ----------------
   _buildPits() {
+    if (this.walled) return this._buildInfieldPits();
     const t = this.track, W = t.W;
     const r = rng(21);
     const cols = ['#e8e8e8', '#1c1c1c', '#8a1a1a', '#1a3d8a', '#d0d0d0', '#444', '#f0f0f0', '#2c5530'];
