@@ -525,8 +525,9 @@ function renderSession(dt) {
     const tgt = track.pos(ss + 25, 0, {}); camera.lookAt(tgt.x, 1, tgt.z);
   }
   if (window.__freecam) { // debug: orbit view of the player's car
-    _v.set(...window.__freecam); playerMesh.localToWorld(_v);
-    camera.position.copy(_v); _tgt.set(0, 0.65, 0); playerMesh.localToWorld(_tgt); camera.lookAt(_tgt);
+    const fm = window.__freecamMesh || playerMesh;
+    _v.set(...window.__freecam); fm.localToWorld(_v);
+    camera.position.copy(_v); _tgt.set(0, 0.65, 0); fm.localToWorld(_tgt); camera.lookAt(_tgt);
   }
 
   // stuck / wrong way
@@ -560,4 +561,4 @@ ensureCars([]).then(() => {
   // park it on the front stretch for the menu backdrop
   placeCar(playerMesh, track.x[0], track.z[0], 0, 0, -3);
 });
-window.__lps = { renderer, sound, track, surface, get session() { return session; }, settings, startSession, setCam };
+window.__lps = { renderer, sound, aiMeshes, track, surface, get session() { return session; }, settings, startSession, setCam };
