@@ -246,6 +246,99 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #12 Robert Ballou: red car, white chassis and cage, white upper tail with
+  // J.B. Hinchman Indianapolis, gold Suburban Subaru with the arrow, gold 12 on
+  // a starred blue panel, BALLOU plate, Engler ovals, polished rims
+  ballou12(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const red = '#d4202a', white = '#f4f4f1', gold = '#d9a93a', blue = '#1d3f9e', black = '#111111';
+    x.fillStyle = red; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    const oval = (t, cx, cy, w, h) => {
+      x.fillStyle = black; x.beginPath(); x.ellipse(cx, cy, w / 2, h / 2, 0, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = white; x.lineWidth = h * 0.1; x.beginPath(); x.ellipse(cx, cy, w / 2 - h * 0.08, h / 2 - h * 0.08, 0, 0, Math.PI * 2); x.stroke();
+      txt(t, cx, cy, h * 0.42, white, { weight: 800, maxW: w * 0.78 });
+    };
+    // gold 12 on a blue panel with white stars
+    const starPanel = (cx, cy, w, h) => {
+      x.fillStyle = blue; x.fillRect(cx - w / 2, cy - h / 2, w, h);
+      x.fillStyle = white;
+      for (let i = 0; i < 5; i++) for (const sx of [-1, 1]) { x.beginPath(); x.arc(cx + sx * w * 0.43, cy - h * 0.4 + i * h * 0.2, h * 0.04, 0, 7); x.fill(); }
+      txt('12', cx, cy, h * 0.85, gold, { italic: true, stroke: black, sw: 0.08, maxW: w * 0.78 });
+    };
+    // hood sides: Suburban Subaru with the gold arrow, small sponsors low
+    const hoodSide = (w, h, rr) => {
+      const cx = rr ? w * 0.42 : w * 0.58, d = rr ? 1 : -1;
+      x.fillStyle = black; x.fillRect(cx - w * 0.2, h * 0.3, w * 0.4, h * 0.36);
+      x.fillStyle = gold;
+      x.beginPath(); x.moveTo(cx - d * w * 0.16, h * 0.36); x.lineTo(cx + d * w * 0.1, h * 0.36); x.lineTo(cx + d * w * 0.1, h * 0.3);
+      x.lineTo(cx + d * w * 0.19, h * 0.4); x.lineTo(cx + d * w * 0.1, h * 0.5); x.lineTo(cx + d * w * 0.1, h * 0.44); x.lineTo(cx - d * w * 0.16, h * 0.44); x.fill();
+      txt('SUBURBAN', cx - d * w * 0.02, h * 0.52, h * 0.11, gold, { maxW: w * 0.3 });
+      txt('SUBARU', cx - d * w * 0.02, h * 0.61, h * 0.09, gold, { maxW: w * 0.26 });
+      oval('ENGLER', rr ? w * 0.1 : w * 0.9, h * 0.3, w * 0.12, h * 0.14);
+      const lows = [['HOOKER', 0.12], ['ENGLER', 0.3], ['HOOSIER', 0.62], ['CHALKSTIX', 0.82]];
+      for (const [t, f] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.86, h * 0.08, white, { weight: 800, maxW: w * 0.15 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => {
+      x.fillStyle = white; x.fillRect(0, h * 0.86, w, h * 0.05);
+      txt("DEATON'S", w * 0.5, h * 0.4, h * 0.22, gold, { stroke: black, sw: 0.1, maxW: w * 0.6 });
+    };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // hood top: the starred 12 up front, Deaton's Waterproof Services behind it
+    P.flat(R.hoodTop, true, (w, h) => {
+      starPanel(w * 0.15, h * 0.5, w * 0.22, h * 0.5);
+      x.save(); x.translate(w * 0.42, h * 0.5); x.rotate(-Math.PI / 2);
+      txt("DEATON'S WATERPROOF", 0, 0, w * 0.05, gold, { stroke: black, sw: 0.12, maxW: h * 0.7 });
+      x.restore();
+    });
+    // cockpit sides: red with a white upper edge, Engler oval
+    const cockSide = (w, h) => {
+      x.fillStyle = white; x.fillRect(0, 0, w, h * 0.12);
+      oval('ENGLER', w * 0.5, h * 0.5, w * 0.5, h * 0.16);
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: white upper tail with J.B. Hinchman, gold BU logo and Deaton's,
+    // gold 12 outlined blue on the back
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = white;
+      x.beginPath(); x.moveTo(0, 0); x.lineTo(w, 0); x.lineTo(w, rr ? h * 0.42 : h * 0.3); x.lineTo(0, rr ? h * 0.3 : h * 0.42); x.fill();
+      x.fillStyle = black; x.fillRect(0, h * 0.02, w, h * 0.012);
+      const fx = rr ? w * 0.3 : w * 0.7;
+      txt('J.B.Hinchman', fx, h * 0.14, h * 0.13, black, { italic: true, weight: 700, font: '"Snell Roundhand", "Brush Script MT", cursive', maxW: w * 0.36 });
+      txt('INDIANAPOLIS', fx, h * 0.25, h * 0.05, black, { weight: 800, maxW: w * 0.22 });
+      txt('BU', rr ? w * 0.14 : w * 0.86, h * 0.56, h * 0.16, gold, { italic: true, stroke: black, sw: 0.1 });
+      txt("DEATON'S", rr ? w * 0.14 : w * 0.86, h * 0.72, h * 0.06, gold, { maxW: w * 0.18 });
+      txt('12', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.38, gold, { italic: true, stroke: blue, sw: 0.14, maxW: w * 0.3 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => {
+      x.fillStyle = white; x.fillRect(0, 0, w, h * 0.55);
+      txt('ZDDPLUS', w * 0.5, h * 0.3, h * 0.12, black, { maxW: w * 0.5 });
+    });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = white; x.fillRect(0, 0, w, h * 0.35); });
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = red; x.fillRect(0, 0, w, h); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = white; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('BALLOU', 0, 0, w * 0.6, gold, { stroke: black, sw: 0.14, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 350; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#e9e9e4', roof: white, rim: '#cfd3d6', helmet: '#d4202a', coverLeft: false,
+      number: gold, numberOutline: blue, numberShadow: black, paintedTailNumbers: true,
+    };
+  },
+
   // #19AZ Mitchel Moles: white car, light-blue top edges and nose with black
   // arcs, big winged RDI Development logo, AME Electrical, MOLES plate,
   // sponsor stack on the tail, black wheels
