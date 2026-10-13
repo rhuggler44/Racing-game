@@ -136,7 +136,8 @@ export class Car {
     // steering (slightly less lock at speed), stagger pulls left
     let delta = clamp(inp.steer, -1, 1) * P.maxSteer / (1 + Math.max(u, 0) / 70);
     if (this.assists && u > 4) delta += clamp(0.5 * beta, -0.22, 0.22); // countersteer help
-    delta -= P.stagger;
+    // the stagger pulls hardest on the gas; off the gas / braking it mostly lets go
+    delta -= P.stagger * (0.35 + 0.65 * clamp(inp.throttle, 0, 1));
     delta = clamp(delta, -P.maxSteer, P.maxSteer);
     // steering rack has finite speed
     const maxRate = 4.0 * dt;
@@ -159,7 +160,9 @@ export class Car {
     let Frev = 0;
     if (brk > 0.3 && thr < 0.05 && u < 0.6) Frev = -2200 * brk;
 
-    let Fxr = Fd - Fbrake * 0.55 * sgnU + (u < 0.6 ? Frev : 0);
+    // rear brakes can only use part of the rear grip, so hard braking from big
+    // speed (Eldora's straights) doesn't lock the rears and swap ends
+    let Fxr = Fd - Math.min(Fbrake * 0.55, Crear * 0.45) * sgnU + (u < 0.6 ? Frev : 0);
     let spin = 0;
     if (Math.abs(Fxr) > Crear) {
       spin = Math.abs(Fxr) / Crear - 1;
@@ -167,8 +170,10 @@ export class Car {
     }
     const latFrac = Math.max(Math.sqrt(Math.max(0, 1 - (Fxr / Crear) ** 2)), this.assists ? 0.6 : 0.45);
     const Fyr = -Crear * latFrac * tire(ar, P.tireB, P.tireC);
-    const Fyf = -mu * Fzf * tire(af, P.tireB, P.tireC);
-    const Fxf = -Fbrake * 0.45 * sgnU;
+    // front tires share their grip between braking and turning too
+    const Cfront = mu * Fzf;
+    const Fxf = -Math.min(Fbrake * 0.45, Cfront * 0.9) * sgnU;
+    const Fyf = -Cfront * Math.sqrt(Math.max(0, 1 - (Fxf / Cfront) ** 2)) * tire(af, P.tireB, P.tireC);
 
     const drag = 0.5 * 1.2 * P.CdA * u * Math.abs(u);
     const roll = crr * m * G * sgnU;
