@@ -246,6 +246,85 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #92 Chase Stockon: white car, teal chassis and cage, purple band edged in
+  // pink with teal stripes sweeping down the sides, Lucas Oil Center / Engler
+  // on the white cockpit sides, big teal 92 outlined purple on the tail
+  stockon92(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const white = '#f5f6f7', teal = '#3cc8c0', purple = '#3c3fb8', pink = '#ec2f93', black = '#111111';
+    x.fillStyle = white; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // the purple band: pink edges, a teal stripe through it, sweeping down toward the nose
+    const band = (w, h, rr, y0, y1, drop) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      const poly = (a, b, col) => {
+        x.fillStyle = col; x.beginPath();
+        x.moveTo(0, h * (a + drop)); x.lineTo(w, h * a); x.lineTo(w, h * b); x.lineTo(0, h * (b + drop)); x.fill();
+      };
+      const t = y1 - y0;
+      poly(y0 - 0.03, y1 + 0.03, pink);
+      poly(y0, y1, purple);
+      poly(y0 + t * 0.42, y0 + t * 0.58, teal);
+      poly(y0 + t * 0.6, y0 + t * 0.64, pink);
+      x.restore();
+    };
+    const hoodSide = (w, h, rr) => {
+      band(w, h, rr, 0.3, 0.62, 0.12);
+      const lows = [['SPRINTCARS.COM', 0.78, 0.2], ['RAVENS', 0.55, 0.12], ['CHALKSTIX', 0.32, 0.15]];
+      for (const [t, f, mw] of lows) txt(t, rr ? w * f : w * (1 - f), h * 0.12, h * 0.08, purple, { weight: 800, maxW: w * mw });
+      txt('MOOSE RACING', rr ? w * 0.2 : w * 0.8, h * 0.9, h * 0.08, teal, { stroke: purple, sw: 0.1, maxW: w * 0.24 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h) => { x.fillStyle = teal; x.fillRect(0, h * 0.7, w, h * 0.12); x.fillStyle = purple; x.fillRect(0, h * 0.82, w, h * 0.06); };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    // cockpit sides: white sponsor panel at the back, the band across the bottom
+    const cockSide = (w, h) => {
+      x.fillStyle = teal; x.fillRect(0, 0, w, h * 0.05);
+      x.fillStyle = pink; x.fillRect(0, h * 0.55, w, h * 0.32);
+      x.fillStyle = purple; x.fillRect(0, h * 0.58, w, h * 0.26);
+      x.fillStyle = teal; x.fillRect(0, h * 0.68, w, h * 0.05);
+      x.fillStyle = pink; x.fillRect(0, h * 0.735, w, h * 0.012);
+      const top = [['ENGLER', 0.12], ['LUCAS OIL CENTER', 0.25], ['DEWIG MEATS', 0.38]];
+      for (const [t, fy] of top) txt(t, w * 0.25, h * fy, h * 0.09, purple, { maxW: w * 0.42 });
+      txt('S&C MACHINE', w * 0.72, h * 0.25, h * 0.07, purple, { maxW: w * 0.4 });
+      txt('SUPERIOR', w * 0.72, h * 0.42, h * 0.08, black, { italic: true, maxW: w * 0.4 });
+      txt('BROWN BROTHERS', w * 0.5, h * 0.79, h * 0.06, white, { maxW: w * 0.6 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: white with the big teal 92 outlined purple
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = teal; x.fillRect(0, 0, w, h * 0.06); x.fillStyle = pink; x.fillRect(0, h * 0.06, w, h * 0.015);
+      txt('92', rr ? w * 0.6 : w * 0.48, h * 0.5, h * 0.42, teal, { italic: true, stroke: purple, sw: 0.12, maxW: w * 0.32 });
+      txt('ENGLER', rr ? w * 0.18 : w * 0.82, h * 0.3, h * 0.07, purple, { maxW: w * 0.2 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = teal; x.fillRect(0, 0, w * 0.1, h); x.fillRect(w * 0.9, 0, w * 0.1, h); });
+    P.flat(R.hoodTop, true, (w, h) => {
+      x.fillStyle = purple; x.fillRect(0, 0, w * 0.22, h);
+      x.fillStyle = pink; x.fillRect(w * 0.22, 0, w * 0.015, h);
+      x.fillStyle = teal; x.fillRect(w * 0.235, 0, w * 0.05, h);
+    });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = teal; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('STOCKON', 0, 0, w * 0.55, white, { stroke: purple, sw: 0.14, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 350; i++) { x.fillStyle = `rgba(120,95,70,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: teal, roof: white, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: purple, coverLeft: false,
+      number: teal, numberOutline: purple, numberShadow: white, paintedTailNumbers: true,
+    };
+  },
+
   // #30 CJ Leary: black car with a bright blue band, giant white LEARY
   // Construction outlined black, white sponsor stack on the cockpit sides,
   // white nose, huge white 30 outlined blue on the black tail, black wheels
