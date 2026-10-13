@@ -46,8 +46,8 @@ function rejoin(label, s, d, headOff, speed, thrLevel) {
 
 const tz = track.turnZones;
 const spots = [
-  ['infield, front stretch', 20, -W / 2 - 2.2],
-  ['infield, turn 2', (tz[1].s0 + tz[2].s1) / 2 + 30, -W / 2 - 2.2],
+  ['inside edge, front stretch', 20, -W / 2 - 0.6],
+  ['inside edge, turn 2', (tz[1].s0 + tz[2].s1) / 2 + 30, -W / 2 - 0.6],
   ['backstretch runoff', 255, W / 2 + 5],
   ['turn 3-4 runoff', 370, W / 2 + 8],
   ['turn 3-4 runoff, far', 380, W / 2 + 18],
