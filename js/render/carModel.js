@@ -246,6 +246,80 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #63 Cale Coons: black car with red and white slash pinstripes, CURB Records
+  // in white, Kalitta / Mechanical Advantage sponsor stack on the tail, big
+  // silver-white 63 outlined black and red on the back of the tail
+  coons63(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const black = '#121214', red = '#d0202e', white = '#f4f4f2', silver = '#d9dbde';
+    x.fillStyle = black; x.fillRect(0, 0, S, S);
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke2) { x.lineWidth = size * (opt.sw2 || 0.3); x.strokeStyle = opt.stroke2; x.strokeText(t, px, py, opt.maxW); }
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // thin red + white slashes sweeping back
+    const slashes = (w, h, rr, n = 4, y0 = 0.55) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); }
+      for (let i = 0; i < n; i++) {
+        x.strokeStyle = i % 2 ? white : red; x.lineWidth = h * (i % 2 ? 0.012 : 0.022);
+        x.beginPath(); x.moveTo(w * (0.05 + i * 0.06), h * (y0 + 0.4)); x.quadraticCurveTo(w * 0.45, h * (y0 + 0.1 - i * 0.04), w, h * (y0 - 0.35 - i * 0.05)); x.stroke();
+      }
+      x.restore();
+    };
+    const hoodSide = (w, h, rr) => {
+      slashes(w, h, rr, 4, 0.6);
+      x.fillStyle = white; const bx = rr ? w * 0.56 : w * 0.14;
+      x.fillRect(bx, h * 0.18, w * 0.3, h * 0.03); x.fillRect(bx, h * 0.72, w * 0.3, h * 0.03);
+      txt('CURB', bx + w * 0.15, h * 0.42, h * 0.38, white, { maxW: w * 0.28 });
+      txt('RECORDS', bx + w * 0.15, h * 0.63, h * 0.1, white, { weight: 800, maxW: w * 0.24 });
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    const noseSide = (w, h, rr) => slashes(w, h, rr, 2, 0.7);
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    const cockSide = (w, h, rr) => {
+      x.strokeStyle = red; x.lineWidth = h * 0.02; x.beginPath(); x.moveTo(0, h * 0.9); x.lineTo(w, h * 0.55); x.stroke();
+      x.strokeStyle = white; x.lineWidth = h * 0.01; x.beginPath(); x.moveTo(0, h * 0.95); x.lineTo(w, h * 0.6); x.stroke();
+      txt('CC', w * 0.5, h * 0.25, h * 0.1, white, { italic: true });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: sponsor stack up front, 63 on the back half
+    const tailSide = (w, h, rr) => {
+      slashes(w, h, rr, 3, 0.75);
+      const cx = rr ? w * 0.27 : w * 0.73;
+      x.strokeStyle = white; x.lineWidth = h * 0.012; x.beginPath(); x.ellipse(cx, h * 0.16, w * 0.17, h * 0.11, -0.1, 0, Math.PI * 2); x.stroke();
+      txt('Kalitta', cx, h * 0.15, h * 0.09, red, { stroke: white, sw: 0.18, maxW: w * 0.3 });
+      txt('MECHANICAL', cx, h * 0.33, h * 0.05, white, { weight: 800, maxW: w * 0.36 });
+      txt('ADVANTAGE', cx, h * 0.39, h * 0.05, white, { weight: 800, maxW: w * 0.36 });
+      x.fillStyle = red; x.beginPath(); x.arc(cx - w * 0.08, h * 0.52, h * 0.05, 0, 7); x.fill();
+      txt('TJ', cx - w * 0.08, h * 0.52, h * 0.05, white);
+      txt('FK', cx + w * 0.08, h * 0.52, h * 0.06, white, { stroke: black, sw: 0.1 });
+      txt('Gateway Paintball', cx, h * 0.64, h * 0.04, white, { weight: 700, maxW: w * 0.38 });
+      txt('IMPACT', cx, h * 0.72, h * 0.05, white, { italic: true, maxW: w * 0.3 });
+      txt('63', rr ? w * 0.62 : w * 0.48, h * 0.44, h * 0.38, silver, { stroke: black, sw: 0.12, stroke2: red, sw2: 0.24, maxW: w * 0.3 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = red; x.fillRect(w * 0.46, 0, w * 0.03, h); x.fillStyle = white; x.fillRect(w * 0.51, 0, w * 0.015, h); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = red; x.fillRect(0, h * 0.7, w, h * 0.3); });
+    P.flat(R.hoodTop, true, (w, h) => { x.fillStyle = red; x.fillRect(0, h * 0.47, w, h * 0.03); x.fillStyle = white; x.fillRect(0, h * 0.52, w, h * 0.015); });
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = black; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('COONS', 0, 0, w * 0.6, white, { italic: true, stroke: red, sw: 0.1, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 350; i++) { x.fillStyle = `rgba(190,150,110,${0.05 + Math.random() * 0.1})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#141414', roof: black, rim: '#dfe3e6', helmet: '#e8e8e8', coverLeft: false,
+      number: silver, numberOutline: black, numberShadow: red, paintedTailNumbers: true,
+    };
+  },
+
   // #14 Jadon Rogers: white car, giant black Beasley's script with the train
   // logo and "Railcar Repair Corp" on the hood sides, black tail top with Lucky
   // Seven / Parallax, big white 14 outlined black and red on the tail
