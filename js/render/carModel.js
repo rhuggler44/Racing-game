@@ -246,6 +246,100 @@ function sidePainter(x, k) {
 }
 
 const CUSTOM_LIVERIES = {
+  // #4 Justin Grant: black carbon on top, blue below with orange pinstripes,
+  // big white NOS Energy Drink on the hood sides, white 4 on the blue nose,
+  // Topp / MPV / Hemelgarn stack on the tail, GRANT plate, black wheels
+  grant4(drv) {
+    const S = 1024, k = S / ATLAS;
+    const c = canvas(S, S), x = c.getContext('2d');
+    const P = sidePainter(x, k), R = P.R;
+    const carbon = '#16181c', blue = '#1f6fe0', orange = '#ff6a1a', white = '#ffffff', black = '#0b0b0b';
+    // carbon weave as the base
+    x.fillStyle = carbon; x.fillRect(0, 0, S, S);
+    for (let yy = 0; yy < S; yy += 4) for (let xx = (yy / 4) % 2 ? 0 : 4; xx < S; xx += 8) { x.fillStyle = 'rgba(255,255,255,0.035)'; x.fillRect(xx, yy, 4, 4); }
+    const txt = (t, px, py, size, color, opt = {}) => {
+      x.font = `${opt.italic ? 'italic ' : ''}${opt.weight || 900} ${Math.floor(size)}px ${opt.font || '"Arial Black", Arial, sans-serif'}`;
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
+      if (opt.stroke) { x.lineWidth = size * (opt.sw || 0.16); x.strokeStyle = opt.stroke; x.strokeText(t, px, py, opt.maxW); }
+      x.fillStyle = color; x.fillText(t, px, py, opt.maxW);
+    };
+    // lower body: blue sweeping up toward the front, outlined in orange
+    const blueSweep = (w, h, rr, lowAtRear = 0.62, highAtFront = 0.2) => {
+      x.save(); if (!rr) { x.translate(w, 0); x.scale(-1, 1); } // shapes drawn with the rear on the right
+      x.fillStyle = blue;
+      x.beginPath(); x.moveTo(0, h * highAtFront); x.quadraticCurveTo(w * 0.35, h * (highAtFront + 0.05), w, h * lowAtRear); x.lineTo(w, h); x.lineTo(0, h); x.fill();
+      x.strokeStyle = orange; x.lineWidth = h * 0.035;
+      x.beginPath(); x.moveTo(0, h * (highAtFront - 0.04)); x.quadraticCurveTo(w * 0.35, h * (highAtFront + 0.01), w, h * (lowAtRear - 0.04)); x.stroke();
+      x.restore();
+    };
+    // hood sides: carbon up top, blue low, big NOS Energy Drink with the arrow
+    const hoodSide = (w, h, rr) => {
+      blueSweep(w, h, rr, 0.78, 0.62);
+      const cx = w * 0.5;
+      txt('NOS', rr ? w * 0.32 : w * 0.68, h * 0.47, h * 0.66, white, { italic: true, stroke: orange, sw: 0.07, maxW: w * 0.44 });
+      txt('ENERGY', rr ? w * 0.74 : w * 0.26, h * 0.33, h * 0.3, white, { maxW: w * 0.4 });
+      txt('DRINK', rr ? w * 0.74 : w * 0.26, h * 0.62, h * 0.3, white, { maxW: w * 0.4 });
+      // the arrow over NOS
+      x.fillStyle = white; const ax = rr ? w * 0.16 : w * 0.84, dir = rr ? 1 : -1;
+      x.fillRect(Math.min(ax, ax + dir * w * 0.3), h * 0.16, w * 0.3, h * 0.05);
+      x.beginPath(); x.moveTo(ax + dir * w * 0.34, h * 0.185); x.lineTo(ax + dir * w * 0.29, h * 0.1); x.lineTo(ax + dir * w * 0.29, h * 0.27); x.fill();
+    };
+    P.flat(R.hoodSideL, true, hoodSide);
+    P.flat(R.hoodSideR, false, hoodSide);
+    // nose: blue with a big white 4
+    const noseSide = (w, h) => {
+      x.fillStyle = blue; x.fillRect(0, 0, w, h);
+      x.strokeStyle = orange; x.lineWidth = h * 0.05; x.strokeRect(0, h * 0.04, w, h * 0.92);
+      txt('4', w * 0.5, h * 0.52, h * 0.9, white, { italic: true, stroke: black, sw: 0.14, maxW: w * 0.6 });
+    };
+    P.flat(R.noseSideL, true, noseSide); P.flat(R.noseSideR, false, noseSide);
+    P.flat(R.noseFront, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, 0, w, h); });
+    // cockpit sides: carbon with a blue lower panel full of small sponsors
+    const cockSide = (w, h) => {
+      x.fillStyle = blue; x.fillRect(0, h * 0.5, w, h * 0.5);
+      x.fillStyle = orange; x.fillRect(0, h * 0.47, w, h * 0.03);
+      txt('GRANT', w * 0.5, h * 0.2, h * 0.08, white, { weight: 800 });
+      const items = [['HINCHMAN', 0.3, 0.6], ['MAXIM', 0.74, 0.6], ['BELL', 0.3, 0.74], ['ULTRA SHIELD', 0.72, 0.74], ['FK', 0.3, 0.88], ['HOOSIER', 0.72, 0.88]];
+      for (const [t, fx, fy] of items) txt(t, w * fx, h * fy, h * 0.07, white, { weight: 800, maxW: w * 0.42 });
+    };
+    P.rot90(R.cockpitL, true, cockSide); P.rot90(R.cockpitR, false, cockSide);
+    // tail sides: carbon with orange edge, sponsor stack in white
+    const tailSide = (w, h, rr) => {
+      x.fillStyle = blue; x.fillRect(0, h * 0.82, w, h * 0.18);
+      x.fillStyle = orange; x.fillRect(rr ? w * 0.94 : 0, 0, w * 0.06, h * 0.82);
+      const cx = w * 0.5;
+      txt('TOPP', cx, h * 0.14, h * 0.13, white, { italic: true, maxW: w * 0.6 });
+      txt('MOTORSPORTS', cx, h * 0.25, h * 0.06, white, { weight: 800, maxW: w * 0.6 });
+      txt('TOPP', cx, h * 0.39, h * 0.11, white, { font: 'Georgia, serif', maxW: w * 0.6 });
+      txt('INDUSTRIES INC.', cx, h * 0.48, h * 0.05, white, { weight: 700, maxW: w * 0.6 });
+      txt('MPV', cx, h * 0.6, h * 0.12, white, { italic: true, maxW: w * 0.5 });
+      txt('LOGISTICS', cx, h * 0.69, h * 0.05, white, { weight: 800, maxW: w * 0.5 });
+      x.fillStyle = white; x.fillRect(w * 0.2, h * 0.74, w * 0.6, h * 0.07);
+      txt('HEMELGARN', cx, h * 0.775, h * 0.055, black, { maxW: w * 0.56 });
+    };
+    P.flat(R.tailSideL, true, tailSide); P.rot180(R.tailSideR, false, tailSide);
+    // hood top: carbon with stacked NOS / TOPP / MPV logos
+    P.flat(R.hoodTop, true, (w, h) => {
+      const at = [['NOS', 0.62, 0.17], ['TOPP', 0.44, 0.1], ['MPV', 0.3, 0.1], ['TOPP INC', 0.18, 0.08]];
+      for (const [t, u, sz] of at) { x.save(); x.translate(w * u, h * 0.5); x.rotate(Math.PI / 2); txt(t, 0, 0, w * sz, white, { italic: true, maxW: h * 0.6 }); x.restore(); }
+      x.fillStyle = blue; x.fillRect(0, 0, w * 0.12, h);
+    });
+    P.flat(R.tailTop, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, 0, w * 0.12, h); x.fillRect(w * 0.88, 0, w * 0.12, h); });
+    P.flat(R.tailRear, true, (w, h) => { x.fillStyle = blue; x.fillRect(0, h * 0.6, w, h * 0.4); });
+    // cage plate: GRANT
+    P.flat(R.namePlate, true, (w, h) => {
+      x.fillStyle = blue; x.fillRect(0, 0, w, h);
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-Math.PI / 2);
+      txt('GRANT', 0, 0, w * 0.62, black, { italic: true, maxW: h * 0.85 });
+      x.restore();
+    });
+    for (let i = 0; i < 300; i++) { x.fillStyle = `rgba(160,90,45,${0.06 + Math.random() * 0.12})`; x.beginPath(); x.arc(Math.random() * S, Math.random() * S, Math.random() * 3 + 0.4, 0, 7); x.fill(); }
+    return {
+      canvas: c, chassis: '#121212', roof: blue, rim: '#1c1c1c', rimColor: '#1a1a1a', helmet: '#151515', coverLeft: false,
+      number: white, numberOutline: black, numberShadow: blue, paintedTailNumbers: true,
+    };
+  },
+
   // #5T Jake Swanson: white car with red/black stripes along the top edges,
   // SNAKE Enterprises + Inland Rigging on the hood sides, black sponsor panel on
   // the front of the tail, big black 5T outlined in red on the back of the tail
@@ -720,11 +814,16 @@ function coverDisc(radius, rect) {
   return g;
 }
 
-function wheel(R, Ri, w, side, atlasMat, coverRect) {
+const _rimMatsByColor = {};
+function rimMatFor(color) {
+  return _rimMatsByColor[color] || (_rimMatsByColor[color] = new THREE.MeshPhongMaterial({ color, shininess: 90, specular: '#666666', side: THREE.DoubleSide }));
+}
+function wheel(R, Ri, w, side, atlasMat, coverRect, rimColor) {
   const g = new THREE.Group();
   const tire = new THREE.Mesh(tireGeo(R, Ri, w), tireMat());
   g.add(tire);
-  const [rimM, darkM] = rimMats();
+  let [rimM, darkM] = rimMats();
+  if (rimColor) rimM = rimMatFor(rimColor); // painted / black wheels
   // rim: the outside face is dished; side = +1 left, -1 right
   const rim = new THREE.Mesh(rimGeo(Ri, w, -0.04), rimM);
   rim.scale.x = side; // dish faces outward on either side
@@ -771,11 +870,11 @@ export async function buildSprintCar(drv) {
   const fl = new THREE.Group(), fr = new THREE.Group();
   fl.position.set(LEFT * 0.8, 0.3, 1.07);
   fr.position.set(RIGHT * 0.8, 0.3, 1.07);
-  wheels.fl = wheel(0.3, 0.19, 0.2, LEFT, atlasMat, liv.coverLeft ? PAINT_REGIONS.wheelFront : null); fl.add(wheels.fl);
-  wheels.fr = wheel(0.3, 0.19, 0.22, RIGHT, atlasMat, null); fr.add(wheels.fr);
+  wheels.fl = wheel(0.3, 0.19, 0.2, LEFT, atlasMat, liv.coverLeft ? PAINT_REGIONS.wheelFront : null, liv.rimColor); fl.add(wheels.fl);
+  wheels.fr = wheel(0.3, 0.19, 0.22, RIGHT, atlasMat, null, liv.rimColor); fr.add(wheels.fr);
   car.add(fl, fr);
-  wheels.rl = wheel(0.43, 0.2, 0.36, LEFT, atlasMat, liv.coverLeft ? PAINT_REGIONS.wheelRear : null); wheels.rl.position.set(LEFT * 0.82, 0.43, -1.06);
-  wheels.rr = wheel(0.455, 0.2, 0.44, RIGHT, atlasMat, null); wheels.rr.position.set(RIGHT * 0.88, 0.455, -1.06);
+  wheels.rl = wheel(0.43, 0.2, 0.36, LEFT, atlasMat, liv.coverLeft ? PAINT_REGIONS.wheelRear : null, liv.rimColor); wheels.rl.position.set(LEFT * 0.82, 0.43, -1.06);
+  wheels.rr = wheel(0.455, 0.2, 0.44, RIGHT, atlasMat, null, liv.rimColor); wheels.rr.position.set(RIGHT * 0.88, 0.455, -1.06);
   car.add(wheels.rl, wheels.rr);
 
   car.traverse((o) => { if (o.isMesh) o.castShadow = true; });
