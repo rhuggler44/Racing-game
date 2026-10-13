@@ -128,7 +128,7 @@ export class Car {
 
     // vertical load: banking adds load when turning into it
     const turnIn = u > 0 && w < 0 ? -u * w : 0;
-    const loadMul = clamp(Math.cos(bank) + turnIn * Math.sin(bank) / G, 0.6, 1.8);
+    const loadMul = clamp(Math.cos(bank) + turnIn * Math.sin(bank) / G, 0.6, 2.8); // high banks (Eldora) press the tires down hard
     const Fz = m * G * loadMul;
     const Fzf = clamp(Fz * P.b / WB - m * this.ax * P.h / WB, Fz * 0.15, Fz * 0.85);
     const Fzr = Fz - Fzf;
@@ -281,7 +281,7 @@ export class Car {
     const steerRate = steer * (off ? 1.1 + 0.7 * clamp(1 - sp / 25, 0, 1) : 0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
     let turn = steerRate - slide * 1.85 - 0.06 * sf * cornering;   // + right, - left (stagger pulls left in turns)
     if (fwd < 0) turn = -steer * 0.8;
-    const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 1.8);
+    const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 2.8); // high banks (Eldora) press the tires down hard
     let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));
     if (sp > this.speedLimit) aDrive = 0;
     // grip of the clay, minus what wheelspin is using up
@@ -356,7 +356,7 @@ export class Car {
     const psi = this.th - Math.atan2(tsm.tz, tsm.tx);
     const ext = P.halfWidth * Math.abs(Math.cos(psi)) + P.halfLength * Math.abs(Math.sin(psi));
     // outer wall depends on the section of track; inside is the infield berm
-    const outer = W / 2 + t.wallE(pr.s), inner = -W / 2 - 2.6;
+    const outer = W / 2 + t.wallE(pr.s), inner = -W / 2 - (t.innerEdge || 2.6);
     let pen = 0, nSign = 0;
     if (pr.d + ext > outer) { pen = pr.d + ext - outer; nSign = 1; }
     else if (pr.d - ext < inner) { pen = inner - (pr.d - ext); nSign = -1; }

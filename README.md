@@ -23,6 +23,13 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 - **Sound plays** (Settings): *Always* plays the game sound even with the iPhone's silent switch on, but pauses your music. *With my music* mixes with Spotify / Apple Music, but the silent switch mutes the game. Sound **Off** never touches your music.
 - Desktop testing: arrow keys / WASD, `C` switches camera, `P` pauses, `R` resets the car.
 
+## Tracks
+Pick the track on the main menu.
+- **Lincoln Park Speedway** (Putnamville, IN): 5/16-mile clay oval, open turns, wall on the front stretch only (details below).
+- **Eldora Speedway** (Rossburg, OH): the high-banked 1/2-mile, laid out from an in-car video. A concrete wall and catch fence all the way around, billboards along the fence in the turns, an inside wall with yellow pads, gray-brown clay, big grandstands down both straights and the tower out of turn 4. Banking and dimensions are approximate.
+
+Best hot laps are saved separately for each track.
+
 ## What's in v1
 - **Hot laps** with a saved best lap. The track record is 12.276 s (Brady Bacon, 2018).
 - **Feature race** against up to 21 AI cars, 10/15/25 laps, with a rolling two-wide start and green/white/checkered flags.
@@ -37,13 +44,13 @@ A 410 non-wing sprint car racing game for your phone's browser, starting with
 ## Project layout
 | Path | What it does |
 |---|---|
-| `js/track.js` | Track shape (5/16 mi, banking) and the dirt surface model (grip, cushion, marbles) |
+| `js/track.js` | Track definitions (Lincoln Park, Eldora), shape and banking, and the dirt surface model (grip, cushion, marbles) |
 | `js/physics.js` | Player car physics: throttle steer, banking, cushion, walls, flips |
 | `js/ai.js` | AI field: speed profiles per lane, groove choice, passing |
 | `js/session.js` | Hot laps and race flow: pace lap, flags, positions, contact |
 | `js/render/` | three.js track scene, car model/livery, dust and roost |
 | `js/input.js`, `js/audio.js` | Tilt/touch controls, synthesized 410 engine sound |
-| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs`, `node tools/rejoin-test.mjs` for getting back on the track) |
+| `tools/*.mjs` | Headless tuning tests (`node tools/sim-test.mjs`, `node tools/race-test.mjs [eldora]`, `node tools/rejoin-test.mjs` for getting back on the track) |
 
 ## Hosting with GitHub Pages
 In the repo, go to **Settings → Pages**. Under *Build and deployment*, set *Source* to **Deploy from a branch**,

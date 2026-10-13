@@ -1,10 +1,11 @@
-// Headless full-race check: node tools/race-test.mjs
-import { buildTrack, Surface } from '../js/track.js';
+// Headless full-race check: node tools/race-test.mjs [track id, e.g. eldora]
+import { buildTrack, Surface, TRACKS } from '../js/track.js';
 import { autopilot } from '../js/physics.js';
 import { Session } from '../js/session.js';
 import { DRIVERS, PLAYER } from '../js/drivers.js';
 
-const track = buildTrack();
+const track = buildTrack(TRACKS[process.argv[2]] || undefined);
+console.log(track.def.name);
 for (const prep of ['dialed', 'heavy']) {
   const surface = new Surface(track, prep);
   const ses = new Session({ track, surface, mode: 'race', laps: 10, fieldSize: 22, difficulty: 'pro', startPos: 'middle', drivers: DRIVERS, player: PLAYER });
@@ -12,7 +13,7 @@ for (const prep of ['dialed', 'heavy']) {
   const log = [];
   const dt = 1 / 60; let steps = 0;
   while (!done && steps < 60 * 400) {
-    const lane = -4;
+    const lane = -track.W * 0.235;
     const v = ses.phase === 'pace' ? 21 : ses.field.profile.speed(ses.car.s + 15, 0.25) * 0.9;
     ses.update(dt, autopilot(ses.car, track, lane, v));
     for (const m of ses.messages) if (m.t === 0 || (m.t < dt * 1.01)) log.push(`${ses.raceTime.toFixed(1)}s ${m.text}`);

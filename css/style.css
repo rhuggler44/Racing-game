@@ -61,6 +61,7 @@ p { line-height: 1.4; margin: 6px 0; }
   color: var(--text); font: inherit; font-size: 13px; font-weight: 600; padding: 8px 6px; border-radius: 8px; cursor: pointer;
 }
 .seg button.on { background: rgba(242, 207, 126, 0.18); border-color: var(--gold); color: var(--gold); }
+.track-pick { max-width: 300px; margin: 6px auto 0; }
 .rot-icon { font-size: 48px; text-align: center; color: var(--gold); }
 
 /* ---------- HUD ---------- */
