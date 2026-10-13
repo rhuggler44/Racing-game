@@ -56,6 +56,7 @@ export class Car {
     this.frontWheelSpeed = speed;
     this.rpm = 2500;
     this.flipped = false;
+    this._spinT = 0;
     this.speedLimit = Infinity; // pace-lap governor
     this.flipSpeed = 17;
     this.flipCause = null;
@@ -261,6 +262,7 @@ export class Car {
       thr *= 1 - this._tcCut;
     }
     let c = Math.cos(this.th), s = Math.sin(this.th);
+    if (this._spinT > 0) return this._spinning(dt, sm, c, s, wrap);
     let vx = this.u * c - this.v * s, vz = this.u * s + this.v * c;
     const sp = Math.hypot(vx, vz);
     const fwd = this.u;
@@ -354,6 +356,43 @@ export class Car {
     const rpmT = clamp(Math.abs(this.rearWheelSpeed) * P.rpmPerMps, 2300, 9400);
     this.rpm += (rpmT - this.rpm) * Math.min(1, dt * 12);
     this.throttle = thr;
+  }
+
+  // knocked into a spin by contact: dir +1 / -1 = which way it rotates
+  spinOut(dir, strength) {
+    if (this.handling === 'easy') {
+      if (this._spinT > 0) return;
+      this._spinT = 1.2 + Math.min(1.2, strength * 0.06);
+      this._spinRate = dir * (3.5 + Math.min(4, strength * 0.3));
+    } else {
+      this.w += dir * (1.5 + Math.min(4, strength * 0.3)); // the physics takes it from there
+    }
+  }
+
+  // Easy handling, mid-spin: no control; the car rotates and scrubs off speed
+  // along the way it was going, then you get it back
+  _spinning(dt, sm, c, s, wrap) {
+    this._spinT -= dt;
+    let vx = this.u * c - this.v * s, vz = this.u * s + this.v * c;
+    const sp = Math.hypot(vx, vz);
+    const k = sp > 0.1 ? Math.max(0, sp - 11 * dt) / sp : 0;
+    vx *= k; vz *= k;
+    this.th = wrap(this.th + this._spinRate * dt);
+    this.w = this._spinRate;
+    this._spinRate *= 1 - Math.min(1, dt * 0.8);
+    c = Math.cos(this.th); s = Math.sin(this.th);
+    this.u = vx * c + vz * s;
+    this.v = -vx * s + vz * c;
+    this.x += vx * dt; this.z += vz * dt;
+    this._walls(sm, vx, vz);
+    this._slide = 0; this._lastAng = undefined; this._pathRate = 0;
+    this.beta = Math.atan2(this.v, Math.max(Math.abs(this.u), 1));
+    this.slip = 1; this.spin = 0.6; this.delta *= 0.9; this.pushing = false;
+    this.rearWheelSpeed += (this.u - this.rearWheelSpeed) * Math.min(1, dt * 4);
+    this.frontWheelSpeed = this.u;
+    this.rpm += (2600 - this.rpm) * Math.min(1, dt * 3);
+    this.throttle = 0;
+    if (this._spinT <= 0) this._spinT = 0;
   }
 
   _walls(sm, vx, vz) {

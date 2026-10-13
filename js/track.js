@@ -19,6 +19,7 @@ export const LINCOLN_PARK = {
   bankStraight: 4 * DEG,
   recordLap: 12.276,
   recordBy: 'Brady Bacon, 2018',
+  aiPace: 1.15,         // Outlaw runs low 10s here, with the fast Easy-handling laps
   layout: 'lincoln',    // open turns (see zones()), clay berm around the infield
   inner: { apron: 1.6, edge: 2.6 },
   // clay colors: tacky, dry, cushion, marbles

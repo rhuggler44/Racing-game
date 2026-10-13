@@ -343,40 +343,79 @@ export class Session {
     this.message(pos === 1 ? 'YOU WIN!' : `Finished P${pos}`, 4, true);
   }
 
+  // Car-to-car contact (you vs the AI cars), with lapped cars too. Both cars are
+  // the same weight: the closing speed is shared out between them, so you
+  // can't plow through people. Rubbing just bumps; a hard hit spins the car
+  // that took it (a shot to the rear or a hard side hit), but no flips.
   _contact(dt) {
-    const t = this.track, car = this.car;
+    const t = this.track, car = this.car, L = t.L;
     if (car.flipped) return;
     const sm = {};
     const pf = [Math.cos(car.th), Math.sin(car.th)];
-    const pc = [[car.x + pf[0] * 0.9, car.z + pf[1] * 0.9], [car.x - pf[0] * 0.9, car.z - pf[1] * 0.9]];
     const R = 1.0;
     for (const c of this.field.cars) {
-      const dS = c.S - car.S;
+      let dS = (c.S - car.S) % L;
+      if (dS > L / 2) dS -= L; else if (dS < -L / 2) dS += L;
       if (Math.abs(dS) > 6 || Math.abs(c.d - car.d) > 4) continue;
       t.pos(c.S, c.d, sm);
       const cf = [Math.cos(c.heading), Math.sin(c.heading)];
+      const pc = [[car.x + pf[0] * 0.9, car.z + pf[1] * 0.9], [car.x - pf[0] * 0.9, car.z - pf[1] * 0.9]];
       const cc = [[sm.x + cf[0] * 0.9, sm.z + cf[1] * 0.9], [sm.x - cf[0] * 0.9, sm.z - cf[1] * 0.9]];
-      for (const a of pc) for (const b of cc) {
-        const dx = a[0] - b[0], dz = a[1] - b[1];
+      // deepest overlap between the two cars' front/rear circles
+      let hit = null;
+      for (let ia = 0; ia < 2; ia++) for (let ib = 0; ib < 2; ib++) {
+        const dx = pc[ia][0] - cc[ib][0], dz = pc[ia][1] - cc[ib][1];
         const dist = Math.hypot(dx, dz);
-        if (dist < 2 * R && dist > 1e-3) {
-          const nx = dx / dist, nz = dz / dist, pen = 2 * R - dist;
-          // relative velocity along normal
-          const pvx = car.u * pf[0] - car.v * pf[1], pvz = car.u * pf[1] + car.v * pf[0];
-          const cvx = c.v * sm.tx + c.dVel * sm.nx, cvz = c.v * sm.tz + c.dVel * sm.nz;
-          const rel = (pvx - cvx) * nx + (pvz - cvz) * nz;
-          let jx = 0, jz = 0;
-          if (rel < 0) { const j = -rel * 0.6; jx = nx * j; jz = nz * j; }
-          car.push(nx * pen * 0.55, nz * pen * 0.55, jx, jz);
-          // AI gets pushed in track coords
-          const pushD = -(nx * sm.nx + nz * sm.nz) * pen * 0.45;
-          const pushS = -(nx * sm.tx + nz * sm.tz);
-          c.d += pushD; c.dVel += pushD * 4;
-          c.v = Math.max(0, c.v + pushS * (rel < 0 ? -rel * 0.5 : 0));
-          if (rel < -3 && !this._bang) { this._bang = 0.4; this.onContact && this.onContact(-rel); }
-        }
+        if (dist < 2 * R && dist > 1e-3 && (!hit || dist < hit.dist)) hit = { dist, nx: dx / dist, nz: dz / dist, ia, ib };
+      }
+      if (!hit) continue;
+      const { nx, nz } = hit, pen = 2 * R - hit.dist;
+      // velocities (world)
+      const pvx = car.u * pf[0] - car.v * pf[1], pvz = car.u * pf[1] + car.v * pf[0];
+      const cvx = c.v * sm.tx + c.dVel * sm.nx, cvz = c.v * sm.tz + c.dVel * sm.nz;
+      const rel = (pvx - cvx) * nx + (pvz - cvz) * nz; // < 0: closing
+      // push apart, half each
+      car.push(nx * pen * 0.5, nz * pen * 0.5, 0, 0);
+      c.d -= (nx * sm.nx + nz * sm.nz) * pen * 0.5;
+      c.S -= (nx * sm.tx + nz * sm.tz) * pen * 0.5;
+      if (rel >= 0) continue;
+      // equal masses, a little bounce: each car takes half the exchange
+      const j = (-rel * (1 + 0.25)) / 2;
+      car.push(0, 0, nx * j, nz * j);
+      c.v = Math.max(0, c.v - (nx * sm.tx + nz * sm.tz) * j);
+      c.dVel -= (nx * sm.nx + nz * sm.nz) * j;
+      const strength = -rel;
+      if (strength > 2.5 && !this._bang) { this._bang = 0.35; this.onContact && this.onContact(strength); }
+      if (strength < 5.5 || this.phase === 'pace') continue; // rubbin's racing
+      // a hard hit: who gets turned around?
+      //  - nose into someone's tail: the car in front spins
+      //  - side by side: the car getting shoved sideways spins if it's hard enough
+      const along = Math.abs(nx * sm.tx + nz * sm.tz); // 1 = nose-to-tail, 0 = side-to-side
+      const youBehind = dS > 0;
+      // which way it rotates: away from the side it was hit on
+      const lat = nx * sm.nx + nz * sm.nz; // + = you're on the outside of it
+      if (along > 0.55) {
+        if (youBehind && hit.ib === 1 && Math.abs(c.d - car.d) > 0.35) this._spin(c, lat > 0 ? 1 : -1, strength);
+        else if (!youBehind && hit.ia === 1 && Math.abs(c.d - car.d) > 0.35 && strength > 8) this._spinPlayer(lat > 0 ? -1 : 1, strength);
+        else if (strength > 9) (youBehind ? this._spin(c, lat > 0 ? 1 : -1, strength) : this._spinPlayer(lat > 0 ? -1 : 1, strength));
+      } else if (strength > 9) {
+        // the slower-moving car on the receiving end gets turned
+        if (car.u > c.v) this._spin(c, lat > 0 ? 1 : -1, strength);
+        else this._spinPlayer(lat > 0 ? -1 : 1, strength);
       }
     }
     if (this._bang) { this._bang -= dt; if (this._bang <= 0) this._bang = 0; }
   }
+
+  _spin(c, dir, strength) {
+    if (c.spin) return;
+    this.field.spinOut(c, dir, strength);
+    this.message(`${c.driver.name} spins!`, 2);
+  }
+  _spinPlayer(dir, strength) {
+    if (this.car._spinT > 0) return;
+    this.car.spinOut(dir, strength);
+    this.message('You got turned around!', 2.2, true);
+  }
+
 }

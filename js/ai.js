@@ -140,11 +140,43 @@ export class AIField {
   }
 
   // others: array of {S, d, v} including the player
+  // knocked around: dir +1 / -1 = which way it rotates
+  spinOut(c, dir, strength) {
+    if (c.spin) return;
+    c.spin = { t: 1.4 + Math.min(1.2, strength * 0.06), rate: dir * (3.5 + Math.min(4, strength * 0.3)) };
+    c.spinHeading = c.heading;
+  }
+
   step(dt, others, mode) {
     const t = this.track, W = t.W, pf = this.profile;
     pf.update();
     const all = others;
+    const L = t.L;
+    // gap along the track, wrapped to one lap: a car you're lapping is right
+    // there in front of you, not a whole lap away
+    const gap = (o, c) => { let g = (o.S - c.S) % L; if (g > L / 2) g -= L; else if (g < -L / 2) g += L; return g; };
     for (const c of this.cars) {
+      // spun out: rotate, scrub off speed, slide to a stop, then get going again
+      if (c.spin) {
+        const sp = c.spin;
+        sp.t -= dt;
+        c.spinHeading += sp.rate * dt;
+        sp.rate *= 1 - Math.min(1, dt * 0.9);
+        c.v = Math.max(0, c.v - 13 * dt);
+        c.dVel *= 1 - Math.min(1, dt * 2);
+        c.d = clamp(c.d + c.dVel * dt, -W / 2 + 0.9, W / 2 - 1.0);
+        const smS = t.sample(c.S, this._sm);
+        c.S += (c.v / (1 + smS.k * c.d)) * dt;
+        c.heading = c.spinHeading;
+        c.slide = 0;
+        c.rpm += (2600 - c.rpm) * Math.min(1, dt * 3);
+        c.wheelRot += (c.v / 0.45) * dt;
+        if (sp.t <= 0 && c.v < 4) {
+          // refire, pointed the right way, and rejoin from where it stopped
+          c.spin = null; c.dTarget = c.d; c.laneTimer = 2;
+        }
+        continue;
+      }
       // racing logic
       c.laneTimer -= dt;
       const sNow = t.wrap(c.S);
@@ -166,8 +198,10 @@ export class AIField {
         let ahead = null, gapA = 1e9;
         for (const o of all) {
           if (o === c) continue;
-          const g = o.S - c.S;
-          if (g > 0 && g < 16 && Math.abs(o.d - c.d) < 2.3 && g < gapA) { gapA = g; ahead = o; }
+          const g = gap(o, c);
+          // look further ahead the faster you're closing (lapped traffic, a spun car)
+          const look = 16 + Math.max(0, c.v - o.v) * 1.3;
+          if (g > 0 && g < look && Math.abs(o.d - c.d) < 2.3 && g < gapA) { gapA = g; ahead = o; }
         }
         if (ahead && c.v > ahead.v - 0.5) {
           // try to go around: pick the other groove if it's clear
@@ -178,7 +212,7 @@ export class AIField {
             let clear = true;
             for (const o of all) {
               if (o === c) continue;
-              const g = o.S - c.S;
+              const g = gap(o, c);
               if (g > -6 && g < 9 && Math.abs(o.d - od) < 2.2 && Math.abs(o.d - c.d) > 0.5) { clear = false; break; }
             }
             if (!clear) continue;
@@ -186,7 +220,7 @@ export class AIField {
             if (score > bestScore) { bestScore = score; best = od; }
           }
           if (best !== null && c.laneTimer < 2.5) { c.dTarget = best; c.laneTimer = 2.5; }
-          if (Math.abs(ahead.d - c.d) < 2.1) vT = Math.min(vT, ahead.v + (gapA - 5.5) * 0.9);
+          if (Math.abs(ahead.d - c.d) < 2.1) vT = Math.min(vT, ahead.v + Math.max(0, gapA - 5.5) * 0.9);
         }
         // natural line wander
         c.dTarget += 0;
@@ -202,13 +236,17 @@ export class AIField {
       // side-by-side spacing
       for (const o of all) {
         if (o === c) continue;
-        const g = o.S - c.S, dd = c.d - o.d;
+        if (o.spin) continue;
+        const g = gap(o, c), dd = c.d - o.d;
         if (Math.abs(g) < 4.2 && Math.abs(dd) < 2.15) {
           const push = (2.15 - Math.abs(dd)) * (dd >= 0 ? 1 : -1);
-          c.dVel += push * 6 * dt * 10;
+          // they give you a little room but mostly hold their line: lean on
+          // them and you'll make contact
+          c.dVel += push * 6 * dt * 10 * (o.isPlayer ? 0.35 : 1);
           if (Math.abs(g) < 3.6 && g > 0) vT = Math.min(vT, o.v - 0.5);
         }
       }
+      c.dVel = clamp(c.dVel, -4.5, 4.5); // nobody darts sideways faster than this
       c.d = clamp(c.d + c.dVel * dt, -W / 2 + 0.9, W / 2 - 1.0);
 
       // speed
@@ -227,6 +265,7 @@ export class AIField {
       const slideT = (clamp(latAcc / 62, 0, 0.55) + exitGas) * (0.8 + 0.2 * Math.sin(c.S * 0.07 + c.wobble)) * (c.slideStyle || 1);
       c.slide += (slideT - c.slide) * Math.min(1, dt * 3);
       c.heading = Math.atan2(sm.tz, sm.tx) + Math.atan2(c.dVel, Math.max(c.v, 3)) - c.slide;
+      c.spinHeading = c.heading;
       c.rpm += (clamp(c.v * 172 + (acc > 0 ? 700 : 0), 2600, 9200) - c.rpm) * Math.min(1, dt * 6);
       c.wheelRot += (c.v / 0.45) * dt;
     }
