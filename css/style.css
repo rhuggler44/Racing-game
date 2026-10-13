@@ -126,6 +126,16 @@ body.touch-steer #steer-zone { pointer-events: auto; }
 body.touch-steer #pedal-brake { left: auto; right: calc(max(14px, var(--safe-r)) + 116px); width: 86px; height: 40vh; }
 body.touch-steer #pedal-gas { height: 60vh; }
 
+/* driver select */
+.menu-row { display: flex; gap: 8px; }
+.menu-row .btn { flex: 1; padding-left: 8px; padding-right: 8px; }
+#menu-driver { flex: 1.6; white-space: nowrap; text-transform: none; letter-spacing: 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
+#menu-driver .num, #driver-grid .num { display: inline-block; min-width: 40px; text-align: center; border-radius: 4px; font-weight: 800; font-size: 13px; padding: 1px 4px; }
+#driver-select .panel { max-height: 94vh; display: flex; flex-direction: column; }
+#driver-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px; overflow-y: auto; min-height: 0; flex: 1; padding: 2px; }
+#driver-grid .drv { appearance: none; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.04); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; text-align: left; cursor: pointer; }
+#driver-grid .drv.on { border-color: var(--gold); background: rgba(242, 207, 126, 0.16); color: var(--gold); }
+
 /* race night */
 #night-body h3 { margin: 12px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold); }
 #night-body .nl { display: grid; gap: 2px; font-size: 13px; }

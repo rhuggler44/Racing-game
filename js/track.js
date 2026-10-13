@@ -34,7 +34,8 @@ export const ELDORA = {
   location: 'Rossburg, Ohio',
   lengthLabel: '1/2 mile',
   length: 804.67,
-  straight: 108,        // short straights, big sweeping turns (~80 m radius)
+  straight: 90,         // short straights, big sweeping turns (~88 m radius), from the satellite view
+  backBend: 0.26,       // the backstretch bows out a little instead of running dead straight
   ramp: 45,
   width: 24,
   bankTurn: 20 * DEG,
@@ -42,7 +43,7 @@ export const ELDORA = {
   recordLap: null,
   layout: 'walled',     // wall right at the edge all the way around
   inner: { apron: 2.4, edge: 2.9, wall: true },
-  grip: 0.85,  // the big, fast banks are tuned down to sane lap times
+  grip: 0.8,   // the big, fast banks are tuned down to sane lap times
   aiPace: 1.1,   // the AI's speed profile undersells these banks; this evens it up
   clay: [[104, 86, 70], [176, 158, 134], [88, 72, 58], [150, 134, 112]],
 };
@@ -52,7 +53,10 @@ export const TRACKS = { [LINCOLN_PARK.id]: LINCOLN_PARK, [ELDORA.id]: ELDORA };
 export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   const L = def.length, S = def.straight, T = def.ramp;
   const A = (L - 2 * S) / 2 - 2 * T; // constant-radius arc per turn
-  const kMax = Math.PI / (A + T);
+  // def.backBend: the backstretch isn't dead straight; it bends gently left by
+  // this many radians, and each turn gives up half of that
+  const bend = def.backBend || 0;
+  const kMax = (Math.PI - bend / 2) / (A + T);
   const segs = [
     [S / 2, 's'], [T, 'in'], [A, 'arc'], [T, 'out'],
     [S, 's'], [T, 'in'], [A, 'arc'], [T, 'out'], [S / 2, 's'],
@@ -65,10 +69,11 @@ export function buildTrack(def = LINCOLN_PARK, N = 1000) {
   }
   function curv(s) {
     let s0 = 0;
-    for (const [len, kind] of segs) {
+    for (let si = 0; si < segs.length; si++) {
+      const [len, kind] = segs[si];
       if (s < s0 + len) {
         const t = (s - s0) / len;
-        if (kind === 's') return 0;
+        if (kind === 's') return si === 4 && bend ? (bend / len) * 2 * Math.sin(Math.PI * t) ** 2 : 0;
         if (kind === 'arc') return kMax;
         if (kind === 'in') return kMax * t;
         return kMax * (1 - t);
