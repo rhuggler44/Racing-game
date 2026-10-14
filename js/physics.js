@@ -255,12 +255,11 @@ export class Car {
     let thr = clamp(inp.throttle, 0, 1);
     const brk = clamp(inp.brake, 0, 1), steer = clamp(inp.steer, -1, 1);
     const wrap = (a) => (a > Math.PI ? a - 2 * Math.PI : a < -Math.PI ? a + 2 * Math.PI : a);
-    // throttle assist (with driving aids on): a little traction control that eases
-    // the gas when you're spinning the tires so much the car pushes up the track,
-    // or it's getting too sideways. Helps most coming off the turns on a slick track.
+    // throttle assist (with driving aids on): only steps in when the car is about to
+    // get away from you. The gas is yours: it never backs you off in a normal slide.
     if (this.assists) {
-      const over = (this.pushing && !this._pitch ? 0.25 : 0) + Math.max(0, (this._slide || 0) - 0.5) * 1.5;
-      this._tcCut = (this._tcCut || 0) + (clamp(over, 0, 0.45) - (this._tcCut || 0)) * Math.min(1, dt * 6);
+      const over = Math.max(0, Math.abs(this._slide || 0) - 0.64) * 2.5;
+      this._tcCut = (this._tcCut || 0) + (clamp(over, 0, 0.3) - (this._tcCut || 0)) * Math.min(1, dt * 6);
       thr *= 1 - this._tcCut;
     }
     let c = Math.cos(this.th), s = Math.sin(this.th);
@@ -281,18 +280,22 @@ export class Car {
     // you enter the corner and is at full strength mid-turn, the same spot every lap.
     // the turns only: Eldora's gently curved backstretch still drives like a straightaway
     const cornering = this.track.kMax && !off ? clamp((sm.tk ?? sm.k) / this.track.kMax, 0, 1) : 0;
-    // turn-in: pitching it left at the end of the straight sets the car sideways for
-    // the corner (looks a little ahead, so you can throw it in before the turn starts)
+    // The wheel sets how sideways it is, in proportion: a little left gets it a little
+    // sideways, a lot whips it around; easing off / turning right straightens it back
+    // up. Works from just before the turn (it looks a little ahead) so you can throw
+    // it in at the end of the straight.
     const ahead = this.track.kMax && !off ? clamp((this.track.sample(this.s + 8 + sp * 0.35, this._smA || (this._smA = {})).tk) / this.track.kMax, 0, 1) : 0;
-    const entry = clamp(ahead - cornering * 0.6, 0, 1); // coming into the turn, not once you are in it
-    const pitch = Math.max(0, -steer - 0.1) * 0.7 * entry * clamp((sp - 15) / 15, 0, 1);
-    this._pitch = pitch;
+    const zone = Math.max(cornering, ahead) * clamp((sp - 12) / 15, 0, 1);
+    const steerIn = -steer * 0.62 * zone;                      // + left: rear out, - right: tuck it back in
+    // thrown in: turning in hard on the way into the corner (the slide scrubs speed for a bit)
+    if (steerIn > 0.12 && ahead > cornering + 0.05) this._thrown = 1.2;
+    else this._thrown = Math.max(0, (this._thrown || 0) - dt);
     let slideT = thr * 0.94 * cornering * loose                 // gas: rear steps out in the turns
-      + Math.max(0, -steer) * 0.22 * cornering                   // turning in sharpens it
-      + pitch
-      - Math.max(0, steer) * 0.3;                                // countersteer catches it
+      + steerIn
+      - Math.max(0, steer) * 0.3 * (1 - zone);                   // countersteer catches it on the straights
     slideT = off ? 0 : clamp(slideT, -0.12, this.assists ? 0.7 : 0.95) * sf;
-    const build = slideT > (this._slide || 0) ? 2.6 + pitch * 6 : 3.4;
+    // one smooth motion, quicker the harder you turn it
+    const build = slideT > (this._slide || 0) ? 2.2 + Math.abs(steer) * 2.2 : 3.2;
     this._slide = (this._slide || 0) + (slideT - (this._slide || 0)) * Math.min(1, dt * build);
     const slide = this._slide;
 
@@ -304,17 +307,22 @@ export class Car {
     let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));
     if (sp > this.speedLimit) aDrive = 0;
     // grip of the clay, minus what wheelspin is using up
-    const muTurn = off ? Math.max(mu, 0.95) : mu;
+    // Easy handling: a slick track still has less bite, but not so much less that you crawl
+    const muTurn = off ? Math.max(mu, 0.95) : mu + Math.max(0, 1.25 - mu) * 0.3;
     // EASY_GRIP keeps a perfect Easy lap near the real track record (12.276 at Lincoln Park)
     const aCap = Math.sqrt(Math.max(0.1, (muTurn * G * loadMul * (off ? 1 : EASY_GRIP)) ** 2 - (aDrive * 0.55) ** 2));
     const want = sp * Math.abs(turn);
     this.pushing = want > aCap;
-    // asking for more turn than the tires have: a car pitched way sideways scrubs the
-    // extra off as speed (that's how you slow it for the corner). A normal slide doesn't.
+    // throwing it in way sideways on entry, asking for more turn than the tires have:
+    // the slide scrubs the extra off as speed (that's how you slow it for the corner).
+    // Once you're in the turn it doesn't: on the gas you keep your speed.
     let scrub = 0;
     if (this.pushing && sp > 1) {
-      if (!off) scrub = Math.min((want - aCap) * 0.25, mu * G * 0.6) * clamp((Math.abs(slide) - 0.28) / 0.2, 0, 1);
+      if (!off && this._thrown > 0) scrub = Math.min((want - aCap) * 0.25, mu * G * 0.6) * clamp((Math.abs(slide) - 0.28) / 0.2, 0, 1) * Math.min(1, this._thrown);
       turn = Math.sign(turn) * aCap / sp;
+      // the tires are all used up holding the car in the turn: on the gas the rears
+      // just spin (the engine stays wound up) instead of driving the car any faster
+      if (!off) aDrive *= clamp(1 - ((want - aCap) / aCap) * 0.9, 0.2, 1);
     }
     if (off) { if (sp < 1.2) turn *= sp / 1.2; } else if (sp < 3) turn *= sp / 3;
     ang = wrap(ang + turn * dt);
