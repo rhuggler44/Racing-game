@@ -259,7 +259,7 @@ export class Car {
     // the gas when you're spinning the tires so much the car pushes up the track,
     // or it's getting too sideways. Helps most coming off the turns on a slick track.
     if (this.assists) {
-      const over = (this.pushing ? 0.25 : 0) + Math.max(0, (this._slide || 0) - 0.5) * 1.5;
+      const over = (this.pushing && !this._pitch ? 0.25 : 0) + Math.max(0, (this._slide || 0) - 0.5) * 1.5;
       this._tcCut = (this._tcCut || 0) + (clamp(over, 0, 0.45) - (this._tcCut || 0)) * Math.min(1, dt * 6);
       thr *= 1 - this._tcCut;
     }
@@ -281,11 +281,19 @@ export class Car {
     // you enter the corner and is at full strength mid-turn, the same spot every lap.
     // the turns only: Eldora's gently curved backstretch still drives like a straightaway
     const cornering = this.track.kMax && !off ? clamp((sm.tk ?? sm.k) / this.track.kMax, 0, 1) : 0;
+    // turn-in: pitching it left at the end of the straight sets the car sideways for
+    // the corner (looks a little ahead, so you can throw it in before the turn starts)
+    const ahead = this.track.kMax && !off ? clamp((this.track.sample(this.s + 8 + sp * 0.35, this._smA || (this._smA = {})).tk) / this.track.kMax, 0, 1) : 0;
+    const entry = clamp(ahead - cornering * 0.6, 0, 1); // coming into the turn, not once you are in it
+    const pitch = Math.max(0, -steer - 0.1) * 0.7 * entry * clamp((sp - 15) / 15, 0, 1);
+    this._pitch = pitch;
     let slideT = thr * 0.94 * cornering * loose                 // gas: rear steps out in the turns
       + Math.max(0, -steer) * 0.22 * cornering                   // turning in sharpens it
+      + pitch
       - Math.max(0, steer) * 0.3;                                // countersteer catches it
     slideT = off ? 0 : clamp(slideT, -0.12, this.assists ? 0.7 : 0.95) * sf;
-    this._slide = (this._slide || 0) + (slideT - (this._slide || 0)) * Math.min(1, dt * (slideT > (this._slide || 0) ? 2.6 : 3.4));
+    const build = slideT > (this._slide || 0) ? 2.6 + pitch * 6 : 3.4;
+    this._slide = (this._slide || 0) + (slideT - (this._slide || 0)) * Math.min(1, dt * build);
     const slide = this._slide;
 
     // ---- how fast the path turns ----
@@ -299,8 +307,15 @@ export class Car {
     const muTurn = off ? Math.max(mu, 0.95) : mu;
     // EASY_GRIP keeps a perfect Easy lap near the real track record (12.276 at Lincoln Park)
     const aCap = Math.sqrt(Math.max(0.1, (muTurn * G * loadMul * (off ? 1 : EASY_GRIP)) ** 2 - (aDrive * 0.55) ** 2));
-    this.pushing = sp * Math.abs(turn) > aCap;
-    if (this.pushing && sp > 1) turn = Math.sign(turn) * aCap / sp;
+    const want = sp * Math.abs(turn);
+    this.pushing = want > aCap;
+    // asking for more turn than the tires have: a car pitched way sideways scrubs the
+    // extra off as speed (that's how you slow it for the corner). A normal slide doesn't.
+    let scrub = 0;
+    if (this.pushing && sp > 1) {
+      if (!off) scrub = Math.min((want - aCap) * 0.25, mu * G * 0.6) * clamp((Math.abs(slide) - 0.28) / 0.2, 0, 1);
+      turn = Math.sign(turn) * aCap / sp;
+    }
     if (off) { if (sp < 1.2) turn *= sp / 1.2; } else if (sp < 3) turn *= sp / 3;
     ang = wrap(ang + turn * dt);
 
@@ -308,7 +323,7 @@ export class Car {
     let speed = fwd < 0 ? -sp : sp;
     speed += aDrive * Math.cos(slide) * dt;
     const drag = (0.5 * 1.2 * P.CdA * sp * sp) / P.mass + crr * G + 2.2 * Math.abs(Math.sin(slide))
-      + brk * mu * G * 0.8 + (this.surfaceKind === 'marbles' ? 1.2 : 0);
+      + brk * mu * G * 0.8 + (this.surfaceKind === 'marbles' ? 1.2 : 0) + scrub;
     if (speed > 0) speed = Math.max(0, speed - drag * dt);
     else speed = Math.min(0, speed + drag * dt);
     if (brk > 0.3 && thr < 0.05 && speed < 0.8) speed = Math.max(speed - 3 * dt, -4); // back up
