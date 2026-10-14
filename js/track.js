@@ -19,7 +19,9 @@ export const LINCOLN_PARK = {
   bankStraight: 4 * DEG,
   recordLap: 12.276,
   recordBy: 'Brady Bacon, 2018',
-  aiPace: 1.15,         // Outlaw runs low 10s here, with the fast Easy-handling laps
+  aiPace: 1.15,         // Pro and Rookie pace here
+  // Outlaw: a couple of cars in the high 9s up front, the back of the field near 11
+  aiRange: { outlaw: [1.175, 1.29] },
   layout: 'lincoln',    // open turns (see zones()), clay berm around the infield
   inner: { apron: 0.3, edge: 1.2 },  // the banked clay runs right to the infield berm
   // clay colors: tacky, dry, cushion, marbles
