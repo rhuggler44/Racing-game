@@ -90,6 +90,10 @@ export class SpeedProfile {
 // Every car's speed for the night is a fresh roll, so a different driver can be
 // fast (or struggling) each time. Driver ratings aren't used for now.
 export function rollSkill(D, track, rng = Math.random) {
+  // a track can set the whole field's range for a difficulty: [slowest, fastest] skill
+  const key = Object.keys(DIFFICULTY).find((k) => DIFFICULTY[k] === D);
+  const range = track.def.aiRange && track.def.aiRange[key];
+  if (range) return range[0] + rng() * (range[1] - range[0]);
   return D.pace * (1 + (rng() - 0.5) * 2 * D.spread) * (track.def.aiPace || 1);
 }
 
