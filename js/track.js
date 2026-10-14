@@ -49,6 +49,9 @@ export const ELDORA = {
   inner: { apron: 0.3, edge: 0.8, wall: true },  // the banked clay runs right to the inside wall
   grip: 0.8,   // the big, fast banks are tuned down to sane lap times
   aiPace: 1.1,   // the AI's speed profile undersells these banks; this evens it up
+  // Outlaw: the front few just quicker than a flat-out lap on the bottom (~14.0), the back near 15;
+  // Pro and Rookie a step back from that
+  aiRange: { outlaw: [1.08, 1.19], pro: [1.0, 1.1], rookie: [0.9, 0.99] },
   clay: [[104, 86, 70], [176, 158, 134], [88, 72, 58], [150, 134, 112]],
 };
 
