@@ -179,6 +179,10 @@ export class Session {
         }
       } else if (e.type === 'wall' && e.strength > 9 && this.mode === 'race' && this.phase !== 'pace') {
         this.highlight('wall', 'player', `${this._last(this.player.name)} pounds the wall ${this._where(car.s)}`, 45);
+      } else if (e.type === 'spun' && this.mode === 'race') {
+        const h = this._playerHitBy && this.time - this._playerHitBy.t < 3 ? this._playerHitBy : null;
+        this.message(h ? `${this._last(h.name)} turned you around!` : 'You lost it!', 2.2, true);
+        this.highlight('spin', 'player', `${this._last(this.player.name)} gets turned around ${this._where(car.s)}${h ? ' by ' + this._last(h.name) : ''}`, 70);
       } else if (e.type === 'hook') {
         this.message('The cushion bit you!', 1.5);
       }
@@ -341,6 +345,7 @@ export class Session {
 
     // ---- contact between player and AI ----
     this._contact(dt);
+    this._spinNews();
     this._watchOrder(dt);
   }
 
@@ -393,80 +398,135 @@ export class Session {
   // the same weight: the closing speed is shared out between them, so you
   // can't plow through people. Rubbing just bumps; a hard hit spins the car
   // that took it (a shot to the rear or a hard side hit), but no flips.
-  _contact(dt) {
-    const t = this.track, car = this.car, L = t.L;
-    if (car.flipped) return;
-    const sm = {};
-    const pf = [Math.cos(car.th), Math.sin(car.th)];
-    const R = 1.0;
+  // ---- car contact ----
+  // Every car is a body with two circles (nose and tail). When two touch, the hit
+  // is worked out at the point of contact: it shoves both cars and twists them
+  // (a tap on someone's right rear swings their tail around; your nose taking the
+  // same hit barely turns you). Each driver then has to catch it: the AI by
+  // skill, you by countersteering. If it can't be caught, it spins, as hard and
+  // whichever way the hit sent it.
+  _bodies() {
+    const t = this.track, car = this.car;
+    const out = this._bodyList || (this._bodyList = []);
+    out.length = 0;
+    if (!car.flipped) {
+      const c = Math.cos(car.th), s = Math.sin(car.th);
+      out.push({ isPlayer: true, S: car.S, d: car.d, x: car.x, z: car.z, th: car.th,
+        vx: car.u * c - car.v * s, vz: car.u * s + car.v * c, name: this.player.name });
+    }
     for (const c of this.field.cars) {
-      let dS = (c.S - car.S) % L;
+      const sm = t.pos(c.S, c.d, {});
+      const vx = c.v * sm.tx + c.dVel * sm.nx, vz = c.v * sm.tz + c.dVel * sm.nz;
+      out.push({ ai: c, S: c.S, d: c.d, x: sm.x, z: sm.z, th: c.heading, vx, vz, tx: sm.tx, tz: sm.tz, nx: sm.nx, nz: sm.nz, name: c.driver.name });
+    }
+    return out;
+  }
+
+  _contact(dt) {
+    const L = this.track.L;
+    const B = this._bodies();
+    for (let i = 0; i < B.length; i++) for (let j = i + 1; j < B.length; j++) {
+      const a = B[i], b = B[j];
+      let dS = (b.S - a.S) % L;
       if (dS > L / 2) dS -= L; else if (dS < -L / 2) dS += L;
-      if (Math.abs(dS) > 6 || Math.abs(c.d - car.d) > 4) continue;
-      t.pos(c.S, c.d, sm);
-      const cf = [Math.cos(c.heading), Math.sin(c.heading)];
-      const pc = [[car.x + pf[0] * 0.9, car.z + pf[1] * 0.9], [car.x - pf[0] * 0.9, car.z - pf[1] * 0.9]];
-      const cc = [[sm.x + cf[0] * 0.9, sm.z + cf[1] * 0.9], [sm.x - cf[0] * 0.9, sm.z - cf[1] * 0.9]];
-      // deepest overlap between the two cars' front/rear circles
-      let hit = null;
-      for (let ia = 0; ia < 2; ia++) for (let ib = 0; ib < 2; ib++) {
-        const dx = pc[ia][0] - cc[ib][0], dz = pc[ia][1] - cc[ib][1];
-        const dist = Math.hypot(dx, dz);
-        if (dist < 2 * R && dist > 1e-3 && (!hit || dist < hit.dist)) hit = { dist, nx: dx / dist, nz: dz / dist, ia, ib };
-      }
-      if (!hit) continue;
-      const { nx, nz } = hit, pen = 2 * R - hit.dist;
-      // velocities (world)
-      const pvx = car.u * pf[0] - car.v * pf[1], pvz = car.u * pf[1] + car.v * pf[0];
-      const cvx = c.v * sm.tx + c.dVel * sm.nx, cvz = c.v * sm.tz + c.dVel * sm.nz;
-      const rel = (pvx - cvx) * nx + (pvz - cvz) * nz; // < 0: closing
-      // push apart, half each
-      car.push(nx * pen * 0.5, nz * pen * 0.5, 0, 0);
-      c.d -= (nx * sm.nx + nz * sm.nz) * pen * 0.5;
-      c.S -= (nx * sm.tx + nz * sm.tz) * pen * 0.5;
-      if (rel >= 0) continue;
-      // equal masses, a little bounce: each car takes half the exchange
-      const j = (-rel * (1 + 0.25)) / 2;
-      car.push(0, 0, nx * j, nz * j);
-      c.v = Math.max(0, c.v - (nx * sm.tx + nz * sm.tz) * j);
-      c.dVel -= (nx * sm.nx + nz * sm.nz) * j;
-      const strength = -rel;
-      if (strength > 2.5 && !this._bang) {
-        this._bang = 0.35; this.onContact && this.onContact(strength);
-        if (strength > 5 && this.phase !== 'pace') this.highlight('contact', 'player', `Contact! ${this._last(this.player.name)} and ${this._last(c.driver.name)} ${this._where(car.s)}`, 35);
-      }
-      if (strength < 5.5 || this.phase === 'pace') continue; // rubbin's racing
-      // a hard hit: who gets turned around?
-      //  - nose into someone's tail: the car in front spins
-      //  - side by side: the car getting shoved sideways spins if it's hard enough
-      const along = Math.abs(nx * sm.tx + nz * sm.tz); // 1 = nose-to-tail, 0 = side-to-side
-      const youBehind = dS > 0;
-      // which way it rotates: away from the side it was hit on
-      const lat = nx * sm.nx + nz * sm.nz; // + = you're on the outside of it
-      if (along > 0.55) {
-        if (youBehind && hit.ib === 1 && Math.abs(c.d - car.d) > 0.35) this._spin(c, lat > 0 ? 1 : -1, strength);
-        else if (!youBehind && hit.ia === 1 && Math.abs(c.d - car.d) > 0.35 && strength > 8) this._spinPlayer(lat > 0 ? -1 : 1, strength);
-        else if (strength > 9) (youBehind ? this._spin(c, lat > 0 ? 1 : -1, strength) : this._spinPlayer(lat > 0 ? -1 : 1, strength));
-      } else if (strength > 9) {
-        // the slower-moving car on the receiving end gets turned
-        if (car.u > c.v) this._spin(c, lat > 0 ? 1 : -1, strength);
-        else this._spinPlayer(lat > 0 ? -1 : 1, strength);
-      }
+      if (Math.abs(dS) > 6 || Math.abs(b.d - a.d) > 4) continue;
+      this._hit(a, b);
     }
     if (this._bang) { this._bang -= dt; if (this._bang <= 0) this._bang = 0; }
   }
 
-  _spin(c, dir, strength) {
-    if (c.spin) return;
-    this.field.spinOut(c, dir, strength);
-    this.message(`${c.driver.name} spins!`, 2);
-    this.highlight('spin', c.driver, `${c.driver.name} spins ${this._where(c.S)} after contact with ${this._last(this.player.name)}`, 60);
+  _hit(A, Bd) {
+    // each car is a box (nerf bars to nerf bars): 1.75 m half length, 0.95 m half width
+    const HL = 1.75, HW = 0.95, K = 1.38; // K: yaw inertia / mass (m²)
+    const fa = [Math.cos(A.th), Math.sin(A.th)], fb = [Math.cos(Bd.th), Math.sin(Bd.th)];
+    const la = [-fa[1], fa[0]], lb = [-fb[1], fb[0]];
+    const dx0 = A.x - Bd.x, dz0 = A.z - Bd.z;
+    // separating axes: the boxes touch only if they overlap along all four; the
+    // push-out goes along the one with the least overlap
+    let best = null;
+    for (const u of [fa, la, fb, lb]) {
+      const r = HL * (Math.abs(fa[0] * u[0] + fa[1] * u[1]) + Math.abs(fb[0] * u[0] + fb[1] * u[1]))
+        + HW * (Math.abs(la[0] * u[0] + la[1] * u[1]) + Math.abs(lb[0] * u[0] + lb[1] * u[1]));
+      const dd = dx0 * u[0] + dz0 * u[1];
+      const ov = r - Math.abs(dd);
+      if (ov <= 0) return;
+      if (!best || ov < best.pen) best = { pen: ov, nx: u[0] * Math.sign(dd || 1), nz: u[1] * Math.sign(dd || 1) };
+    }
+    // where they touch: the corners that ended up inside the other car
+    let px = 0, pz = 0, n = 0;
+    const inside = (P, fp, lp, Q, fq, lq) => {
+      for (let i = -1; i <= 1; i += 2) for (let k = -1; k <= 1; k += 2) {
+        const cx = P.x + fp[0] * HL * i + lp[0] * HW * k, cz = P.z + fp[1] * HL * i + lp[1] * HW * k;
+        const rx = cx - Q.x, rz = cz - Q.z;
+        if (Math.abs(rx * fq[0] + rz * fq[1]) <= HL + 0.05 && Math.abs(rx * lq[0] + rz * lq[1]) <= HW + 0.05) { px += cx; pz += cz; n++; }
+      }
+    };
+    inside(A, fa, la, Bd, fb, lb); inside(Bd, fb, lb, A, fa, la);
+    const hit = n ? { nx: best.nx, nz: best.nz, px: px / n, pz: pz / n } : { nx: best.nx, nz: best.nz, px: (A.x + Bd.x) / 2, pz: (A.z + Bd.z) / 2 };
+    const { nx, nz } = hit, pen = Math.min(best.pen, 0.6);
+    // separate them, half each
+    this._apply(A, nx * pen * 0.5, nz * pen * 0.5, 0, 0, 0);
+    this._apply(Bd, -nx * pen * 0.5, -nz * pen * 0.5, 0, 0, 0);
+    const rvx = A.vx - Bd.vx, rvz = A.vz - Bd.vz;
+    const rel = rvx * nx + rvz * nz; // < 0: closing
+    if (rel >= 0) return;
+    // impulse at the contact point (equal masses, a little bounce, some rubbing friction)
+    const rax = hit.px - A.x, raz = hit.pz - A.z, rbx = hit.px - Bd.x, rbz = hit.pz - Bd.z;
+    const cross = (rx, rz, jx, jz) => rx * jz - rz * jx;
+    const ran = cross(rax, raz, nx, nz), rbn = cross(rbx, rbz, nx, nz);
+    const jn = (-rel * 1.25) / (2 + (ran * ran + rbn * rbn) / K);
+    const tx = -nz, tz = nx, relT = rvx * tx + rvz * tz;
+    const rat = cross(rax, raz, tx, tz), rbt = cross(rbx, rbz, tx, tz);
+    const jt = clamp(-relT / (2 + (rat * rat + rbt * rbt) / K), -0.35 * jn, 0.35 * jn);
+    const Jx = jn * nx + jt * tx, Jz = jn * nz + jt * tz;
+    // the twist: hit behind the middle and the tail gets knocked out (the rear tires
+    // can't hold it); hit up front and the rear tires keep it pointed straight
+    const yaw = (body, rx, rz, jx, jz, f) => {
+      const along = (rx * f[0] + rz * f[1]) / HL; // -1 tail .. +1 nose
+      return (cross(rx, rz, jx, jz) / K) * (along < -0.25 ? 3.4 : along > 0.25 ? 0.5 : 1.1);
+    };
+    const pace = this.phase === 'pace';
+    // leaning on someone (bump drafting, rubbing side by side) shoves; it takes a real hit to twist
+    const twist = pace ? 0 : clamp((-rel - 1.5) / 2.5, 0, 1);
+    const wa = twist * yaw(A, rax, raz, Jx, Jz, fa), wb = twist * yaw(Bd, rbx, rbz, -Jx, -Jz, fb);
+    this._apply(A, 0, 0, Jx, Jz, wa, Bd);
+    this._apply(Bd, 0, 0, -Jx, -Jz, wb, A);
+    const strength = -rel;
+    const withPlayer = A.isPlayer || Bd.isPlayer;
+    if (withPlayer && strength > 2.5 && !this._bang) {
+      this._bang = 0.35; this.onContact && this.onContact(strength);
+      const other = A.isPlayer ? Bd : A;
+      if (strength > 5 && !pace) this.highlight('contact', 'player', `Contact! ${this._last(this.player.name)} and ${this._last(other.name)} ${this._where(this.car.s)}`, 35);
+    }
   }
-  _spinPlayer(dir, strength) {
-    if (this.car._spinT > 0) return;
-    this.car.spinOut(dir, strength);
-    this.message('You got turned around!', 2.2, true);
-    this.highlight('spin', 'player', `${this._last(this.player.name)} gets turned around ${this._where(this.car.s)}`, 70);
+
+  // move / shove / twist one body (world frame)
+  _apply(b, dx, dz, dvx, dvz, dw, by = null) {
+    if (b.isPlayer) {
+      this.car.push(dx, dz, dvx, dvz);
+      if (dw) this.car.knock(dw);
+      if (by) this._playerHitBy = { name: by.name, t: this.time };
+      return;
+    }
+    const c = b.ai;
+    if (dx || dz) { c.d += dx * b.nx + dz * b.nz; c.S += dx * b.tx + dz * b.tz; }
+    if (dvx || dvz || dw) this.field.knock(c, dvx * b.tx + dvz * b.tz, dvx * b.nx + dvz * b.nz, dw);
+    if (by) c.hitBy = { name: by.name, isPlayer: !!by.isPlayer, t: this.time };
+    // keep the snapshot current for the next pair this step
+    b.S = c.S; b.d = c.d;
   }
+
+  // who just lost it (called each step after the cars move)
+  _spinNews() {
+    for (const c of this.field.spunOut) {
+      const h = c.hitBy && this.time - c.hitBy.t < 3 ? c.hitBy : null;
+      this.message(`${c.driver.name} spins!`, 2);
+      if (h && (h.isPlayer || this.playerStatus === 'running')) {
+        this.highlight('spin', c.driver, h.isPlayer ? `${c.driver.name} spins ${this._where(c.S)} after contact with ${this._last(this.player.name)}` : `${c.driver.name} spins ${this._where(c.S)} after contact with ${this._last(h.name)}`, h.isPlayer ? 60 : 45);
+      }
+    }
+    this.field.spunOut.length = 0;
+  }
+
 
 }

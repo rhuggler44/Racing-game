@@ -52,6 +52,7 @@ export class Car {
     this.lap = 0;
     this.S = this.s;
     this.spin = 0; this.slip = 0; this.beta = 0;
+    this._kyaw = 0; this._krate = 0; this._recover = false;
     this.rearWheelSpeed = speed;
     this.frontWheelSpeed = speed;
     this.rpm = 2500;
@@ -299,9 +300,35 @@ export class Car {
     this._slide = (this._slide || 0) + (slideT - (this._slide || 0)) * Math.min(1, dt * build);
     const slide = this._slide;
 
+    // ---- knocked around (car contact) ----
+    // A hit sets the car rotating; the tires and your hands try to catch it. Steer
+    // against it (countersteer) and it comes back; steer with it or have the car
+    // already loose and it gets away from you and spins.
+    let kyaw = this._kyaw || 0;
+    if (kyaw || this._krate) {
+      const sgn = Math.sign(kyaw || this._krate);
+      const catchIt = clamp(-steer * sgn, 0, 1), makeWorse = clamp(steer * sgn, 0, 1);
+      const kp = (off ? 14 : 9) + 18 * catchIt - 6 * makeWorse + (this.assists ? 4 : 0);
+      const kd = 4.5 + 4 * catchIt;
+      this._krate += (-kp * kyaw - kd * this._krate) * dt;
+      kyaw = this._kyaw = kyaw + this._krate * dt;
+      const crit = (this.assists ? 1.1 : 0.98) - 0.3 * clamp(Math.abs(slide) / 0.7, 0, 1);
+      if (this._recover) { if (Math.abs(kyaw) < 0.25) this._recover = false; }
+      else if (Math.abs(kyaw) > crit && sp > 6) {
+        // gone: it spins the way the hit sent it, as hard as the hit sent it
+        const rate = Math.sign(this._krate || kyaw) * clamp(Math.abs(this._krate) * 1.4 + 2, 2.5, 8.5);
+        this._kyaw = 0; this._krate = 0;
+        this.th = wrap(this.th);
+        this._spinT = 1.0 + Math.min(1.2, sp * 0.03) + Math.random() * 0.4;
+        this._spinRate = rate;
+        this.events.push({ type: 'spun', strength: Math.abs(rate) });
+      }
+      if (Math.abs(kyaw) < 0.004 && Math.abs(this._krate) < 0.02) { this._kyaw = 0; this._krate = 0; kyaw = 0; }
+    }
+
     // ---- how fast the path turns ----
     const steerRate = steer * (off ? 1.1 + 0.7 * clamp(1 - sp / 25, 0, 1) : 0.85 + 0.55 * clamp(1 - sp / 35, 0, 1));
-    let turn = steerRate - slide * 1.85 - 0.06 * sf * cornering;   // + right, - left (stagger pulls left in turns)
+    let turn = steerRate - slide * 1.85 + kyaw * 1.6 * sf - 0.06 * sf * cornering;   // + right, - left (stagger pulls left in turns); a knocked car goes where its nose points
     if (fwd < 0) turn = -steer * 0.8;
     const loadMul = clamp(Math.cos(bank) + Math.max(0, -turn * sp) * Math.sin(bank) / G, 0.6, 2.8); // high banks (Eldora) press the tires down hard
     let aDrive = thr * Math.min(mu * G * 0.62, P.power / (P.mass * Math.max(sp, 4)));
@@ -330,7 +357,7 @@ export class Car {
     // ---- speed ----
     let speed = fwd < 0 ? -sp : sp;
     speed += aDrive * Math.cos(slide) * dt;
-    const drag = (0.5 * 1.2 * P.CdA * sp * sp) / P.mass + crr * G + 2.2 * Math.abs(Math.sin(slide))
+    const drag = (0.5 * 1.2 * P.CdA * sp * sp) / P.mass + crr * G + 2.2 * Math.abs(Math.sin(slide)) + 5 * Math.abs(Math.sin(kyaw))
       + brk * mu * G * 0.8 + (this.surfaceKind === 'marbles' ? 1.2 : 0) + scrub;
     if (speed > 0) speed = Math.max(0, speed - drag * dt);
     else speed = Math.min(0, speed + drag * dt);
@@ -360,7 +387,7 @@ export class Car {
     // ---- heading follows the path, minus the slide ----
     const newAng = Math.hypot(vx, vz) > 0.5 ? Math.atan2(vz, vx) : ang;
     const prevTh = this.th;
-    this.th = speed >= 0 ? wrap(newAng - this._slide) : this.th + turn * dt;
+    this.th = speed >= 0 ? wrap(newAng - this._slide + kyaw) : this.th + turn * dt;
     this.w = wrap(this.th - prevTh) / dt;
     this._pathRate = this._lastAng !== undefined && sp > 2 ? clamp(wrap(newAng - this._lastAng) / dt, -3, 3) : 0;
     this._lastAng = newAng;
@@ -385,6 +412,13 @@ export class Car {
   }
 
   // knocked into a spin by contact: dir +1 / -1 = which way it rotates
+  // car contact: a yaw kick (rad/s, + = nose to the right)
+  knock(dw) {
+    if (this.handling !== 'easy') { this.w += dw; return; }
+    if (this._spinT > 0) { this._spinRate += dw; return; }
+    this._krate = (this._krate || 0) + dw;
+  }
+
   spinOut(dir, strength) {
     if (this.handling === 'easy') {
       if (this._spinT > 0) return;
@@ -418,7 +452,20 @@ export class Car {
     this.frontWheelSpeed = this.u;
     this.rpm += (2600 - this.rpm) * Math.min(1, dt * 3);
     this.throttle = 0;
-    if (this._spinT <= 0) this._spinT = 0;
+    if (this._spinT <= 0) {
+      // done spinning: you get it back pointed however it ended up, and the car
+      // comes around to the direction it's rolling (no snapping straight)
+      this._spinT = 0;
+      const sp2 = Math.hypot(vx, vz);
+      if (sp2 > 0.5) {
+        const va = Math.atan2(vz, vx);
+        const k = clamp(wrap(this.th - va), -1.1, 1.1);   // way around backwards: you've already gathered it up to here
+        this.th = wrap(va + k);
+        const c2 = Math.cos(this.th), s2 = Math.sin(this.th);
+        this.u = vx * c2 + vz * s2; this.v = -vx * s2 + vz * c2;
+        this._kyaw = k; this._krate = 0; this._recover = true;
+      }
+    }
   }
 
   _walls(sm, vx, vz) {

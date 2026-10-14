@@ -105,6 +105,7 @@ export class AICar {
     this.S = 0; this.d = 0; this.v = 0;
     this.dTarget = 0; this.dVel = 0;
     this.slide = 0; this.heading = 0;
+    this.kyaw = 0; this.krate = 0; this.recover = false; // knocked around by contact
     this.wheelRot = 0;
     this.finished = false; this.finishTime = 0;
     this.lapStart = 0; this.bestLap = Infinity; this.lastLap = 0;
@@ -121,6 +122,7 @@ export class AIField {
     this.track = track; this.surface = surface;
     this.profile = new SpeedProfile(track, surface);
     this.cars = [];
+    this.spunOut = []; // cars that got away from their drivers this step (for the session)
     const D = DIFFICULTY[difficulty] || DIFFICULTY.pro;
     drivers.forEach((drv, i) => {
       const skill = skills && skills.has(drv) ? skills.get(drv) : rollSkill(D, track);
@@ -143,12 +145,22 @@ export class AIField {
     return this.grooveD(bias > 0 ? topDn - c.laneOffset * 0.06 : botDn + c.laneOffset * 0.08);
   }
 
-  // others: array of {S, d, v} including the player
-  // knocked around: dir +1 / -1 = which way it rotates
-  spinOut(c, dir, strength) {
+  // car contact: a shove (track-frame velocity change) and a yaw kick (rad/s, + = nose right)
+  knock(c, dv, dd, dw) {
+    c.v = Math.max(0, c.v + dv);
+    c.dVel += dd;
+    if (c.spin) { c.spin.rate += dw; return; }
+    c.krate += dw;
+  }
+
+  // gone: spins at the rate the hit gave it, scrubs off speed and slides up the track
+  spinOut(c, rate) {
     if (c.spin) return;
-    c.spin = { t: 1.4 + Math.min(1.2, strength * 0.06), rate: dir * (3.5 + Math.min(4, strength * 0.3)) };
+    const r = Math.sign(rate || 1) * clamp(Math.abs(rate), 2.5, 9);
+    c.spin = { t: 1.0 + Math.random() * 0.8, rate: r, decay: 0.6 + Math.random() * 0.6, scrub: 9 + Math.random() * 4, wall: false };
     c.spinHeading = c.heading;
+    c.kyaw = 0; c.krate = 0;
+    this.spunOut.push(c);
   }
 
   step(dt, others, mode) {
@@ -165,19 +177,32 @@ export class AIField {
         const sp = c.spin;
         sp.t -= dt;
         c.spinHeading += sp.rate * dt;
-        sp.rate *= 1 - Math.min(1, dt * 0.9);
-        c.v = Math.max(0, c.v - 13 * dt);
-        c.dVel *= 1 - Math.min(1, dt * 2);
-        c.d = clamp(c.d + c.dVel * dt, -W / 2 + 0.9, W / 2 - 1.0);
+        sp.rate *= 1 - Math.min(1, dt * sp.decay);
+        c.v = Math.max(0, c.v - sp.scrub * dt);
         const smS = t.sample(c.S, this._sm);
+        // no grip holding it in the turn: it slides up the track
+        c.dVel += Math.min(c.v * c.v * smS.k * 0.55, 9) * dt;
+        c.dVel *= 1 - Math.min(1, dt * 0.8);
+        c.d += c.dVel * dt;
+        if (c.d > W / 2 - 1.0) {
+          // into the wall / cushion: it stops it hard
+          c.d = W / 2 - 1.0;
+          if (c.dVel > 1.5 && !sp.wall) { sp.wall = true; c.v *= 0.7; sp.rate *= 0.5; }
+          c.dVel = -Math.abs(c.dVel) * 0.25;
+        }
+        c.d = Math.max(c.d, -W / 2 + 0.9);
         c.S += (c.v / (1 + smS.k * c.d)) * dt;
         c.heading = c.spinHeading;
         c.slide = 0;
         c.rpm += (2600 - c.rpm) * Math.min(1, dt * 3);
         c.wheelRot += (c.v / 0.45) * dt;
         if (sp.t <= 0 && c.v < 4) {
-          // refire, pointed the right way, and rejoin from where it stopped
+          // refire and rejoin from where it stopped, coming around to point the right way
           c.spin = null; c.dTarget = c.d; c.laneTimer = 2;
+          const path = Math.atan2(smS.tz, smS.tx);
+          let k = c.spinHeading - path;
+          k = Math.atan2(Math.sin(k), Math.cos(k));
+          c.kyaw = k; c.krate = 0; c.recover = true;
         }
         continue;
       }
@@ -268,7 +293,22 @@ export class AIField {
       const exitGas = sm.k > 0.002 && c.v < vT ? 0.08 : 0;
       const slideT = (clamp(latAcc / 62, 0, 0.55) + exitGas) * (0.8 + 0.2 * Math.sin(c.S * 0.07 + c.wobble)) * (c.slideStyle || 1);
       c.slide += (slideT - c.slide) * Math.min(1, dt * 3);
-      c.heading = Math.atan2(sm.tz, sm.tx) + Math.atan2(c.dVel, Math.max(c.v, 3)) - c.slide;
+      // knocked: the driver catches it (better drivers quicker), or it gets away
+      if (c.kyaw || c.krate) {
+        const kp = c.recover ? 5 : 7 + 8 * clamp(c.skill - 1, -0.3, 0.4), kd = c.recover ? 4 : 4;
+        c.krate += (-kp * c.kyaw - kd * c.krate) * dt;
+        c.kyaw += c.krate * dt;
+        if (c.recover) {
+          c.v = Math.min(c.v, 4 + 30 * Math.max(0, 1 - Math.abs(c.kyaw) / 2.5)); // gathering it back up
+          if (Math.abs(c.kyaw) < 0.2) c.recover = false;
+        } else {
+          c.dVel += c.v * Math.sin(c.kyaw) * 0.9 * dt;   // goes where the nose points
+          c.v = Math.max(0, c.v - Math.abs(Math.sin(c.kyaw)) * 7 * dt);
+          if (Math.abs(c.kyaw) > 1.0 - c.slide * 0.4 && c.v > 6) { this.spinOut(c, c.krate * 1.4 + Math.sign(c.krate || c.kyaw) * 2); continue; }
+        }
+        if (Math.abs(c.kyaw) < 0.004 && Math.abs(c.krate) < 0.02) { c.kyaw = 0; c.krate = 0; }
+      }
+      c.heading = Math.atan2(sm.tz, sm.tx) + Math.atan2(c.dVel, Math.max(c.v, 3)) - c.slide + c.kyaw;
       c.spinHeading = c.heading;
       c.rpm += (clamp(c.v * 172 + (acc > 0 ? 700 : 0), 2600, 9200) - c.rpm) * Math.min(1, dt * 6);
       c.wheelRot += (c.v / 0.45) * dt;
