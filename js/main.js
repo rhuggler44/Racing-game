@@ -8,6 +8,7 @@ import { Sound } from './audio.js';
 import { TrackScene } from './render/scene.js';
 import { buildSprintCar, poseCar } from './render/carModel.js';
 import { Dust } from './render/effects.js';
+import { Recorder, Reel, tvCameras } from './replay.js';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -112,6 +113,8 @@ let paused = true;
 let state = 'menu';
 let camMode = settings.camera;
 let lastSessionOpts = null;
+let recorder = null, reel = null, lastReel = [];
+const tvCams = tvCameras(track);
 
 // ---------------- who you're driving ----------------
 // settings.driver = a car number. #44 is you in the RACO car; pick anyone else
@@ -180,9 +183,15 @@ async function startSession(mode, ev = null) {
   };
   session.onGreen = () => { sound.beep(1200, 0.4); input.recenter(); };
   session.onHandover = () => { sound.beep(1200, 0.3); input.recenter(); };
-  session.onDone = () => setTimeout(ev ? nightEventDone : showResults, ev ? 2500 : 1500);
+  session.onDone = () => setTimeout(() => {
+    const next = ev ? nightEventDone : showResults;
+    if (session && session.mode === 'race') highlights(next); else next();
+  }, ev ? 2500 : 1500);
   session.onContact = (s) => sound.hit(s * 0.6);
   lastSessionOpts = ev ? { mode, ev } : mode;
+  stopReel();
+  lastReel = [];
+  recorder = isRace ? new Recorder([playerMesh, ...session.field.cars.map((c) => aiMeshes.get(c.driver))], ['player', ...session.field.cars.map((c) => c.driver)]) : null;
   applyTime();
   trackScene.updateSurface(true);
   playerMesh.userData.flipT = 0;
@@ -314,6 +323,9 @@ document.addEventListener('click', (e) => {
       else if (lastSessionOpts && lastSessionOpts.ev) startSession(null, lastSessionOpts.ev);
       else startSession(lastSessionOpts || 'hotlaps');
     } else if (a === 'quit') { night = null; quit(); }
+    else if (a === 'replay-next') reel && reel.skip();
+    else if (a === 'replay-skip') endReel();
+    else if (a === 'replay-watch') playReel(lastReel, () => { state = 'results'; show('results'); });
     else if (a === 'night-go') { sound.start(); const ev = night && night.next(); if (ev) begin(null, ev); }
   }
 });
@@ -347,6 +359,7 @@ function resume() {
   checkOrientation();
 }
 function quit() {
+  stopReel();
   session = null; paused = true; state = 'menu';
   $('hud').classList.add('hidden');
   sound.update({ paused: true });
@@ -429,6 +442,7 @@ function showResults() {
   const me = st[pos - 1];
   $('results-title').textContent = (night ? 'A-Main: ' : '') + (me.dnf ? 'DNF: flipped' : pos === 1 ? 'Victory Lane! You won!' : `You finished P${pos}`);
   $('results-again').textContent = night ? 'New Night' : 'Race Again';
+  $('results-replay').classList.toggle('hidden', !lastReel.length);
   const L = track.L, leaderDist = st[0].dist;
   $('results-list').innerHTML = st.map((r, i) => {
     const down = st[0].laps - r.laps;
@@ -581,7 +595,10 @@ function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
   dt = Math.min(dt, 1 / 20);
-  if (session) {
+  if (reel) {
+    reel.update(dt);
+    if (reel && !reel.done) followReel();
+  } else if (session) {
     const inp = input.update(dt);
     if (!paused) {
       session.update(dt, inp);
@@ -589,11 +606,12 @@ function frame(now) {
     }
     renderSession(dt);
     updateHud(dt);
+    if (recorder && !paused) { recorder.capture(session.time); recorder.update(session.time, session.highlights); }
   } else {
     attract(dt);
   }
-  dust.update(paused ? 0 : dt);
-  renderer.render(scene, camera);
+  dust.update(paused && !reel ? 0 : dt);
+  if (!window.__norender) renderer.render(scene, camera); // debug: run the sim without drawing
 }
 
 const gasFill = document.querySelector('#pedal-gas .fill'), brakeFill = document.querySelector('#pedal-brake .fill');
@@ -629,6 +647,7 @@ function renderSession(dt) {
   ud.rearRot = (ud.rearRot || 0) + (car.rearWheelSpeed / 0.45) * dt * (paused ? 0 : 1);
   ud.frontRot = (ud.frontRot || 0) + (car.frontWheelSpeed / 0.33) * dt * (paused ? 0 : 1);
   poseCar(playerMesh, car.delta, ud.rearRot, ud.frontRot);
+  ud.pd = car.delta; ud.pr = ud.rearRot; ud.pf = ud.frontRot;
   const fx = Math.cos(car.th), fz = Math.sin(car.th);
   if (!paused && !car.flipped) {
     const mul = car.surfaceKind === 'marbles' || car.surfaceKind === 'cushion' ? 1.6 : car.surfaceKind === 'grass' ? 0.3 : 1;
@@ -646,6 +665,7 @@ function renderSession(dt) {
       placeCar(mesh, p.x, p.z, c.heading, c.S, c.d);
       const w = c.wheelRot;
       poseCar(mesh, c.slide * 0.7, w, w * 1.35); // countersteer
+      mesh.userData.pd = c.slide * 0.7; mesh.userData.pr = w; mesh.userData.pf = w * 1.35;
       const dd = Math.hypot(p.x - car.x, p.z - car.z);
       if (dd < nearest) { nearest = dd; nearRpm = c.rpm; }
       if (!paused && dd < 90) {
@@ -683,6 +703,66 @@ function renderSession(dt) {
   });
 }
 
+// ---------------- highlights ----------------
+// the race is over: show the best moments from the TV cameras, then carry on
+function highlights(next) {
+  if (!recorder) return next();
+  recorder.finish(session.time, session.highlights);
+  lastReel = recorder.reel(5);
+  recorder = null;
+  if (!lastReel.length) return next();
+  playReel(lastReel, next);
+}
+let reelNext = null;
+function playReel(clips, next) {
+  if (!clips.length) return next();
+  state = 'replay'; paused = true;
+  reelNext = next;
+  hideAll();
+  $('hud').classList.add('hidden');
+  $('replay').classList.remove('hidden');
+  if (playerMesh) { playerMesh.userData.helmet.visible = true; playerMesh.userData.shoulders.visible = true; }
+  const meshes = clips.meshes || (clips.meshes = [playerMesh, ...session.field.cars.map((c) => aiMeshes.get(c.driver))]);
+  reel = new Reel({
+    clips, meshes, cams: tvCams, camera, poseCar,
+    onClip: (c, i, n) => {
+      $('replay-cap').textContent = c.text;
+      $('replay-count').textContent = `${i + 1} / ${n}`;
+      const fade = $('replay-fade'); fade.classList.remove('go'); void fade.offsetWidth; fade.classList.add('go');
+    },
+    onCar: (m, vx, vz, slow) => {
+      const sp = Math.hypot(vx, vz);
+      if (sp < 3 || m.position.distanceTo(camera.position) > 140) return;
+      _f.set(0, 0, 1).applyQuaternion(m.quaternion);
+      const fl = Math.hypot(_f.x, _f.z) || 1, fx = _f.x / fl, fz = _f.z / fl;
+      const slide = Math.abs(Math.asin(clamp((fx * vz - fz * vx) / sp, -1, 1)));
+      if (Math.random() < slow) dust.roost(m.position.x, m.position.y, m.position.z, fx, fz, -fz, fx, sp, slide, slide * 1.5, m === playerMesh ? 1 : 0.5);
+    },
+    onDone: () => endReel(),
+  });
+}
+// keep the shadows and the engine on the car the camera is following
+function followReel() {
+  const m = reel.meshes[reel.c.focus];
+  sun.target.position.copy(m.position);
+  sun.position.copy(m.position).add(sunOffset);
+  const sp = reel.speed || 0;
+  sound.update({ rpm: clamp(3200 + sp * 120, 2500, 8600), throttle: 0.85, slip: 0.25, speed: sp, packRpm: 6000, packDist: 1e9, surface: 'track', paused: false });
+}
+function stopReel() {
+  if (reel) reel.stop();
+  reel = null;
+  $('replay').classList.add('hidden');
+}
+function endReel() {
+  if (!reel) return;
+  stopReel();
+  sound.update({ paused: true });
+  setCam(camMode);
+  const next = reelNext; reelNext = null;
+  next && next();
+}
+
 // slow orbit behind the menus
 function attract(dt) {
   attractT += dt * 0.05;
@@ -702,4 +782,4 @@ ensureCars([]).then(() => {
   // park it on the front stretch for the menu backdrop
   placeCar(playerMesh, track.x[0], track.z[0], 0, 0, -3);
 });
-window.__lps = { renderer, sound, aiMeshes, track, surface, get session() { return session; }, settings, startSession, setCam, get night() { return night; } };
+window.__lps = { renderer, sound, aiMeshes, track, surface, get session() { return session; }, settings, startSession, setCam, get night() { return night; }, get reel() { return reel; } };

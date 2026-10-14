@@ -16,6 +16,8 @@ export class Session {
     this.car.handling = opts.handling || 'easy';
     this.time = 0; this.raceTime = 0;
     this.messages = [];
+    // moments worth a replay: { t (session time), kind, focus ('player' or a driver), text, pri }
+    this.highlights = [];
     this.playerLaps = []; this.bestLap = Infinity; this.lastLap = 0;
     this.playerStatus = 'running'; // running | finished | dnf
     this.flag = 'green';
@@ -79,6 +81,19 @@ export class Session {
   }
 
   message(text, dur = 2.5, big = false) { this.messages.push({ text, dur, big, t: 0 }); }
+  highlight(kind, focus, text, pri) {
+    if (this.mode !== 'race') return;
+    // once you've finished (or you're out), only the big stuff counts
+    if (kind !== 'win' && kind !== 'flip' && this.playerStatus !== 'running') return;
+    this.highlights.push({ t: this.time, kind, focus, text, pri });
+  }
+  _where(s) {
+    const n = this.track.turnAt(s);
+    if (n) return `in turn ${n}`;
+    const z = this.track.turnZones, w = this.track.wrap(s);
+    return w > z[3].s1 && w < z[5].s0 ? 'down the backstretch' : 'on the front stretch';
+  }
+  _last(name) { return name.split(' ').slice(-1)[0]; }
 
   playerWorld() { return this.car; }
 
@@ -151,6 +166,7 @@ export class Session {
     for (const e of car.events) {
       if (e.type === 'flip') {
         const what = e.cause === 'bank' ? `OVER THE BANK IN TURN ${this.track.turnAt(car.s) || 2}!` : 'FLIPPED!';
+        if (this.mode === 'race') this.highlight('flip', 'player', e.cause === 'bank' ? `${this._last(this.player.name)} goes over the bank ${this._where(car.s)}!` : `${this._last(this.player.name)} flips ${this._where(car.s)}!`, 100);
         if (this.mode === 'race' && this.playerStatus === 'running') {
           this.playerStatus = 'dnf';
           this.message(`${what} Your night is over.`, 4, true);
@@ -161,6 +177,8 @@ export class Session {
           this.message(what, 2.5, true);
           this._flipReset = 2.5;
         }
+      } else if (e.type === 'wall' && e.strength > 9 && this.mode === 'race' && this.phase !== 'pace') {
+        this.highlight('wall', 'player', `${this._last(this.player.name)} pounds the wall ${this._where(car.s)}`, 45);
       } else if (e.type === 'hook') {
         this.message('The cushion bit you!', 1.5);
       }
@@ -323,6 +341,30 @@ export class Session {
 
     // ---- contact between player and AI ----
     this._contact(dt);
+    this._watchOrder(dt);
+  }
+
+  // passes for position and lead changes, for the highlights
+  _watchOrder(dt) {
+    if (this.phase === 'pace' || this.phase === 'done') { this._order = null; return; }
+    this._orderT = (this._orderT || 0) - dt;
+    if (this._orderT > 0) return;
+    this._orderT = 0.25;
+    const st = this.standings();
+    const me = st.findIndex((r) => r.isPlayer);
+    const leader = st[0].isPlayer ? 'player' : st[0].ref.driver;
+    const prev = this._order;
+    this._order = { me, leader, behind: st[me + 1] };
+    if (!prev || this.raceTime < 4) return; // the start shuffles everyone
+    const name = this._last(this.player.name);
+    if (me < prev.me && this.playerStatus === 'running' && !this.car.flipped) {
+      const passed = st[me + 1];
+      const who = passed ? (passed.isPlayer ? '' : this._last(passed.name)) : '';
+      if (me === 0) this.highlight('lead', 'player', `${name} takes the lead${who ? ' from ' + who : ''} ${this._where(this.car.s)}!`, 90);
+      else this.highlight('pass', 'player', `${name} gets by ${who} for P${me + 1}`, 30 + (this.field.cars.length - me) * 1.5 + (this.flag === 'white' ? 25 : 0));
+    } else if (leader !== prev.leader && leader !== 'player' && prev.leader !== 'player') {
+      this.highlight('lead', leader, `Lead change! ${leader.name} takes over ${this._where(st[0].ref.S)}`, 45);
+    }
   }
 
   _finish(c) {
@@ -330,7 +372,10 @@ export class Session {
     c.finishLaps = Math.floor((c.S - this.track.L) / this.track.L);
     this._finishCount = (this._finishCount || 0) + 1;
     c.finishOrder = this._finishCount;
-    if (this.standings()[0].ref === c && !this._winnerSaid) { this._winnerSaid = true; this.message(`${c.driver.name} wins!`, 3, true); }
+    if (this.standings()[0].ref === c && !this._winnerSaid) {
+      this._winnerSaid = true; this.message(`${c.driver.name} wins!`, 3, true);
+      this.highlight('win', c.driver, `Checkered flag: ${c.driver.name} wins it!`, 200);
+    }
   }
   _finishPlayer() {
     this.playerStatus = 'finished';
@@ -341,6 +386,7 @@ export class Session {
     const pos = this.playerPosition();
     if (pos === 1) this._winnerSaid = true;
     this.message(pos === 1 ? 'YOU WIN!' : `Finished P${pos}`, 4, true);
+    if (pos === 1) this.highlight('win', 'player', `Checkered flag: ${this.player.name} wins it!`, 200);
   }
 
   // Car-to-car contact (you vs the AI cars), with lapped cars too. Both cars are
@@ -385,7 +431,10 @@ export class Session {
       c.v = Math.max(0, c.v - (nx * sm.tx + nz * sm.tz) * j);
       c.dVel -= (nx * sm.nx + nz * sm.nz) * j;
       const strength = -rel;
-      if (strength > 2.5 && !this._bang) { this._bang = 0.35; this.onContact && this.onContact(strength); }
+      if (strength > 2.5 && !this._bang) {
+        this._bang = 0.35; this.onContact && this.onContact(strength);
+        if (strength > 5 && this.phase !== 'pace') this.highlight('contact', 'player', `Contact! ${this._last(this.player.name)} and ${this._last(c.driver.name)} ${this._where(car.s)}`, 35);
+      }
       if (strength < 5.5 || this.phase === 'pace') continue; // rubbin's racing
       // a hard hit: who gets turned around?
       //  - nose into someone's tail: the car in front spins
@@ -411,11 +460,13 @@ export class Session {
     if (c.spin) return;
     this.field.spinOut(c, dir, strength);
     this.message(`${c.driver.name} spins!`, 2);
+    this.highlight('spin', c.driver, `${c.driver.name} spins ${this._where(c.S)} after contact with ${this._last(this.player.name)}`, 60);
   }
   _spinPlayer(dir, strength) {
     if (this.car._spinT > 0) return;
     this.car.spinOut(dir, strength);
     this.message('You got turned around!', 2.2, true);
+    this.highlight('spin', 'player', `${this._last(this.player.name)} gets turned around ${this._where(this.car.s)}`, 70);
   }
 
 }
