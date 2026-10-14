@@ -166,3 +166,23 @@ body.touch-steer #pedal-gas { height: 60vh; }
   #tower { top: 78px; font-size: 10px; line-height: 1.35; }
   .hud-tl .big { font-size: 28px; }
 }
+
+/* ---------- highlight replays ---------- */
+#replay { position: fixed; inset: 0; z-index: 15; pointer-events: none; }
+#replay .rp-bug {
+  position: absolute; top: max(12px, var(--safe-t)); left: max(16px, var(--safe-l)); display: flex; align-items: stretch;
+  font-weight: 900; font-style: italic; letter-spacing: 0.08em; font-size: 15px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+#replay .rp-bug b { background: var(--red); color: #fff; padding: 5px 12px; }
+#replay .rp-bug span { background: rgba(10, 10, 12, 0.85); color: var(--gold); padding: 5px 10px; font-style: normal; font-size: 13px; display: flex; align-items: center; }
+#replay .rp-bug span:empty { display: none; }
+#replay .rp-cap {
+  position: absolute; left: max(16px, var(--safe-l)); bottom: max(18px, var(--safe-b)); max-width: min(70vw, 620px);
+  background: linear-gradient(90deg, rgba(10, 10, 12, 0.92), rgba(10, 10, 12, 0.78)); border-left: 5px solid var(--gold);
+  padding: 9px 16px; font-weight: 800; font-size: 17px; text-transform: uppercase; font-style: italic; letter-spacing: 0.02em;
+}
+#replay .rp-btns { position: absolute; right: max(16px, var(--safe-r)); bottom: max(18px, var(--safe-b)); display: flex; gap: 8px; pointer-events: auto; }
+#replay .rp-btns .btn { padding: 9px 14px; font-size: 13px; background: rgba(10, 10, 12, 0.7); }
+#replay-fade { position: absolute; inset: 0; background: #000; opacity: 0; }
+#replay-fade.go { animation: rpfade 0.45s ease-out; }
+@keyframes rpfade { from { opacity: 1; } to { opacity: 0; } }
